@@ -1,0 +1,218 @@
+{
+  "version": 1,
+  "notes": [
+    "The SMS centre (SMSC) each home network sends texts through, for SIMs whose own number VowiDroid cannot read:",
+    "Android lets only privileged apps read it off the phone's SIM, and the iPhone carrier bundles do not carry it.",
+    "A line uses the user's own entry first, then the number read from the SIM (cards in a USB reader give it up),",
+    "then this table through the carrier profile. Hand-kept: tools/import_carrier_bundles.py never reads or writes it.",
+    "Each entry names its source; 'note' says when the source is a carrier community thread rather than a carrier page,",
+    "or when a carrier runs a second centre for some plans. home_plmns are MCC+MNC with a two- or three-digit MNC."
+  ],
+  "entries": [
+    {
+      "carrier": "T-Mobile US",
+      "country": "US",
+      "home_plmns": ["310260", "310240", "310200", "310210", "310220", "310230", "310250", "310270", "310310", "310490", "310660", "310800", "310160", "310026"],
+      "sms_center": "+12063130004",
+      "source": "https://www.t-mobile.com/support/devices/device-troubleshooting/messaging-and-email-troubleshooting",
+      "note": "T-Mobile's troubleshooting page: 'Make sure the SMSC setting is +12063130004'. Mint, Metro, Boost, Tello and the other MVNOs on these PLMNs use it too."
+    },
+    {
+      "carrier": "AT&T",
+      "country": "US",
+      "home_plmns": ["310410", "310030", "310170", "310280", "310560", "310950", "311180"],
+      "sms_center": "+13123149810",
+      "source": "https://forums.att.com/t5/Android/Text-message/td-p/5138337",
+      "note": "AT&T community moderator: the default for all AT&T SIM cards. AT&T's own device page (att.com/device-support/article/wireless/KM1278408) prints it without the leading 1."
+    },
+    {
+      "carrier": "EE",
+      "country": "GB",
+      "home_plmns": ["23430", "23433"],
+      "sms_center": "+447958879879",
+      "source": "https://community.ee.co.uk/t5/Texting-and-messaging/what-is-my-message-centre-number/td-p/712340",
+      "note": "EE community thread, marked solved."
+    },
+    {
+      "carrier": "O2 UK",
+      "country": "GB",
+      "home_plmns": ["23410", "23411"],
+      "sms_center": "+447802000332",
+      "source": "https://community.o2.co.uk/t5/Android/message-centre-number/m-p/643935",
+      "note": "O2 community moderator: Pay Monthly +447802000332, Pay & Go +447802092035."
+    },
+    {
+      "carrier": "giffgaff",
+      "country": "GB",
+      "home_plmns": ["23410"],
+      "profiles": ["ipcc-giffgaff-23410"],
+      "sms_center": "+447802002606",
+      "source": "https://help.giffgaff.com/en/articles/639659-network-service-troubleshooting",
+      "note": "giffgaff help, Network & Service Troubleshooting: set the SMS service centre number to +44 78020 02606. giffgaff shares O2's 234-10; its SIMs are told apart by their carrier profile (SPN giffgaff or GID1 508)."
+    },
+    {
+      "carrier": "Vodafone UK",
+      "country": "GB",
+      "home_plmns": ["23415"],
+      "sms_center": "+447785016005",
+      "source": "https://deviceguides.vodafone.co.uk/vodafone/r212-leopard/messaging/set-the-message-centre-number/"
+    },
+    {
+      "carrier": "Three UK",
+      "country": "GB",
+      "home_plmns": ["23420"],
+      "sms_center": "+447782000800",
+      "source": "https://community.three.co.uk/t5/Network/SMSC-Number/m-p/21526",
+      "note": "Three community thread."
+    },
+    {
+      "carrier": "Telekom Deutschland",
+      "country": "DE",
+      "home_plmns": ["26201", "26206", "26298"],
+      "sms_center": "+491710760000",
+      "source": "https://www.telekom.de/hilfe/mobilfunk/telefonieren-sms-mms/mitteilungszentrale"
+    },
+    {
+      "carrier": "Vodafone Deutschland",
+      "country": "DE",
+      "home_plmns": ["26202", "26204", "26209"],
+      "sms_center": "+491722270333",
+      "source": "https://www.handyhase.de/magazin/sms-mitteilungszentrale/",
+      "note": "Third-party table (handyhase.de); the same number is what Vodafone customers see texts from."
+    },
+    {
+      "carrier": "O2 Deutschland",
+      "country": "DE",
+      "home_plmns": ["26203", "26207", "26208"],
+      "sms_center": "+491760000443",
+      "source": "https://hilfe.o2online.de/mobilfunkdienste-telefonie-internet-messaging-mehr-22/sms-585294",
+      "note": "O2 community threads."
+    },
+    {
+      "carrier": "Orange France",
+      "country": "FR",
+      "home_plmns": ["20801", "20802"],
+      "sms_center": "+33689004000",
+      "source": "https://assistance.orange.fr/article/comment-verifier-le-numero-de-centre-serveur-d-envoi-de-sms-sur-votre-samsung-sous-android-11_918397"
+    },
+    {
+      "carrier": "SFR",
+      "country": "FR",
+      "home_plmns": ["20810", "20811", "20813"],
+      "sms_center": "+33609001390",
+      "source": "https://communaute.red-by-sfr.fr/t5/Identification-espace-client/centre-de-messages/td-p/183793",
+      "note": "RED by SFR community thread."
+    },
+    {
+      "carrier": "Bouygues Telecom",
+      "country": "FR",
+      "home_plmns": ["20820", "20821"],
+      "sms_center": "+33660003000",
+      "source": "https://forum.bouyguestelecom.fr/questions/794013-impossible-envoyer-sms-xperia-pouvez-aider",
+      "note": "Bouygues forum threads."
+    },
+    {
+      "carrier": "Free Mobile",
+      "country": "FR",
+      "home_plmns": ["20815", "20816"],
+      "sms_center": "+33695000695",
+      "source": "https://mobile.free.fr/assistance/167.html"
+    },
+    {
+      "carrier": "Rogers",
+      "country": "CA",
+      "home_plmns": ["302720", "302723"],
+      "sms_center": "+17057969300",
+      "source": "https://www.rogers.com/support/mobility/cannot-send-text-messages"
+    },
+    {
+      "carrier": "Fido",
+      "country": "CA",
+      "home_plmns": ["302370"],
+      "sms_center": "+15149931123",
+      "source": "https://www.fido.ca/cms/internal_use/FidoSupport_prototype/FidoSupport/Troubleshooting_page_-_Text_Messaging.html"
+    },
+    {
+      "carrier": "Telstra",
+      "country": "AU",
+      "home_plmns": ["50501", "50511", "50571", "50572"],
+      "sms_center": "+61418706700",
+      "source": "https://mobilesupport.telstra.com.au/samsung/galaxy-s20-ultra-5g-android-10-0/messaging-email/i-can-t-send-and-receive-text-messages/44/"
+    },
+    {
+      "carrier": "Optus",
+      "country": "AU",
+      "home_plmns": ["50502"],
+      "sms_center": "+61411990001",
+      "source": "https://yescrowd.optus.com.au/t5/Mobile/message-center-number/td-p/24868",
+      "note": "Optus community moderator; Optus's Galaxy S5 device guide gives the same number."
+    },
+    {
+      "carrier": "Vodafone Australia",
+      "country": "AU",
+      "home_plmns": ["50503"],
+      "sms_center": "+61415011501",
+      "source": "https://www.vodafone.com.au/support/device/text-message"
+    },
+    {
+      "carrier": "Movistar España",
+      "country": "ES",
+      "home_plmns": ["21407"],
+      "sms_center": "+34609090909",
+      "source": "https://comunidad.movistar.es/discussions/ayuda_tecnica_movil/no-puedo-enviar-sms-a-cualquier-n%C3%BAmero/5149944/replies/5150121",
+      "note": "Movistar community support answer."
+    },
+    {
+      "carrier": "Vodafone España",
+      "country": "ES",
+      "home_plmns": ["21401"],
+      "sms_center": "+34607003110",
+      "source": "https://manuales.vodafone.es/samsung/galaxy-s22-ultra-android-12-0/llamadas-y-mensajes/configura-el-telefono-para-mensajes-cortos/"
+    },
+    {
+      "carrier": "Orange España",
+      "country": "ES",
+      "home_plmns": ["21403"],
+      "sms_center": "+34656000311",
+      "source": "https://guias.orange.es/orange-dive-50-android-5-1/funciones/mensajes-correo-electronico-y-chat-online/como-configurar-el-movil-para-sms/"
+    },
+    {
+      "carrier": "TIM",
+      "country": "IT",
+      "home_plmns": ["22201"],
+      "sms_center": "+393359609600",
+      "source": "https://www.international.tim.it/assistenza/supporto-tecnico-e-configurazione/smartphone-e-tablet/configurazioni-e-manuali/ripristino"
+    },
+    {
+      "carrier": "Vodafone Italia",
+      "country": "IT",
+      "home_plmns": ["22210"],
+      "sms_center": "+393492000200",
+      "source": "http://www.vodafone.it/portal/Privati/Tariffe-e-Prodotti/Tariffe/Servizi-SMS---MMS/Faq-SMS",
+      "note": "Vodafone's FAQ; the older +393492000300 still works."
+    },
+    {
+      "carrier": "iliad Italia",
+      "country": "IT",
+      "home_plmns": ["22250"],
+      "sms_center": "+393519999600",
+      "source": "https://www.iliad.it/assistenza/361.html"
+    },
+    {
+      "carrier": "KPN",
+      "country": "NL",
+      "home_plmns": ["20408", "20410"],
+      "sms_center": "+31653131313",
+      "source": "https://community.kpn.com/mobiel-15/voicemail-en-sms-centrale-489199",
+      "note": "KPN community moderator: subscriptions +31653131313, prepaid +31653131314."
+    },
+    {
+      "carrier": "Vodafone Nederland",
+      "country": "NL",
+      "home_plmns": ["20404"],
+      "sms_center": "+316540881000",
+      "source": "https://www.iculture.nl/nieuws/voicemail-instellen-sms-berichten-verzenden-iphone/",
+      "note": "Third-party guide (iCulture); a KPN forum thread cites Vodafone's handbook for the same number."
+    }
+  ]
+}

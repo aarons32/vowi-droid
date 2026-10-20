@@ -1,0 +1,164 @@
+{
+ "deliver": [
+  {
+   "deliveryStatus": "",
+   "direction": "received",
+   "encoding": "gsm7_pdu",
+   "error": "",
+   "from": "+12345",
+   "scts": 1704164645000,
+   "text": "HELLO",
+   "to": "",
+   "tpdu": "0405912143F500004210203040500005C82293F904"
+  },
+  {
+   "concat": {
+    "reference": 122,
+    "sequence": 1,
+    "total": 2
+   },
+   "deliveryStatus": "",
+   "direction": "received",
+   "encoding": "ucs2_pdu",
+   "error": "",
+   "from": "+12345",
+   "scts": 1704164645000,
+   "text": "你好",
+   "to": "",
+   "tpdu": "4405912143F50008421020304050000A0500037A02014F60597D"
+  },
+  {
+   "deliveryStatus": "delivered",
+   "direction": "status_report",
+   "encoding": "unknown",
+   "error": "",
+   "from": "",
+   "reference": 42,
+   "scts": 1704164645000,
+   "status": 0,
+   "text": "",
+   "to": "+12345",
+   "tpdu": "022A05912143F5421020304050004210203050500000"
+  },
+  {
+   "deliveryStatus": "",
+   "direction": "received",
+   "encoding": "gsm7_pdu",
+   "error": "",
+   "from": "Vowi",
+   "scts": 1704164645000,
+   "text": "",
+   "to": "",
+   "tpdu": "0404D0D6F73D0D00004210203040500000"
+  },
+  {
+   "deliveryStatus": "",
+   "direction": "received",
+   "encoding": "8bit_pdu",
+   "error": "",
+   "from": "+12345",
+   "scts": 1704164645000,
+   "text": "AABBCC",
+   "to": "",
+   "tpdu": "0405912143F500F54210203040500003AABBCC"
+  },
+  {
+   "deliveryStatus": "",
+   "direction": "received",
+   "encoding": "unknown",
+   "error": "SMS user data is truncated",
+   "from": "+15555051453",
+   "scts": 1352650921000,
+   "text": "",
+   "to": "",
+   "tpdu": "440B915155051554F30000211111712210401E050003AB0201E8E5391D1406A1C3EC763D9B2F0783C3F2B40D"
+  },
+  {
+   "deliveryStatus": "delivered",
+   "direction": "status_report",
+   "encoding": "unknown",
+   "error": "",
+   "from": "",
+   "reference": 6,
+   "scts": 1352650921000,
+   "status": 0,
+   "text": "",
+   "to": "+15555051453",
+   "tpdu": "06060B915155051554F3211111712210402111117122104000"
+  }
+ ],
+ "submit": [
+  {
+   "parts": [
+    {
+     "encoding": "gsm7_pdu",
+     "part": 1,
+     "total": 1,
+     "tpdu": "21000b915155214365f7000005c8329bfd06"
+    }
+   ],
+   "text": "Hello",
+   "to": "+15551234567"
+  },
+  {
+   "parts": [
+    {
+     "encoding": "gsm7_pdu",
+     "part": 1,
+     "total": 1,
+     "tpdu": "21000b815155214365f700000ec3b0b900daa0deeb4d0ab42903"
+    }
+   ],
+   "text": "Café {ok} €",
+   "to": "15551234567"
+  },
+  {
+   "parts": [
+    {
+     "encoding": "gsm7_pdu",
+     "part": 1,
+     "total": 2,
+     "tpdu": "61000b915155214365f70000a00500033902016031d98c56b3dd7039584c36a3d56c375c0e1693cd6835db0d9783c564335acd76c3e56031d98c56b3dd7039584c36a3d56c375c0e1693cd6835db0d9783c564335acd76c3e56031d98c56b3dd7039584c36a3d56c375c0e1693cd6835db0d9783c564335acd76c3e56031d98c56b3dd7039584c36a3d56c375c0e1693cd6835db0d9783c564"
+    },
+    {
+     "encoding": "gsm7_pdu",
+     "part": 2,
+     "total": 2,
+     "tpdu": "61000b915155214365f700004205000339020266b49aed86cb05854362d1784426954b66d3f98446a5536ad57ac566b561f1985c369fd169f59add76bfe171f99c5eb7dff1793d"
+    }
+   ],
+   "text": "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
+   "to": "+15551234567"
+  },
+  {
+   "parts": [
+    {
+     "encoding": "ucs2_pdu",
+     "part": 1,
+     "total": 1,
+     "tpdu": "21000d91683108108300f000080a4f60597dff0c4e16754c"
+    }
+   ],
+   "text": "你好，世界",
+   "to": "+8613800138000"
+  },
+  {
+   "parts": [
+    {
+     "encoding": "ucs2_pdu",
+     "part": 1,
+     "total": 2,
+     "tpdu": "61000d91683108108300f000088c0500035802014f60597d4f60597d4f60597d4f60597d4f60597d4f60597d4f60597d4f60597d4f60597d4f60597d4f60597d4f60597d4f60597d4f60597d4f60597d4f60597d4f60597d4f60597d4f60597d4f60597d4f60597d4f60597d4f60597d4f60597d4f60597d4f60597d4f60597d4f60597d4f60597d4f60597d4f60597d4f60597d4f60597d4f60"
+    },
+    {
+     "encoding": "ucs2_pdu",
+     "part": 2,
+     "total": 2,
+     "tpdu": "61000d91683108108300f0000824050003580202597d4f60597d4f60597d4f60597d4f60597d4f60597d4f60597dd83dde00"
+    }
+   ],
+   "text": "你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好😀",
+   "to": "+8613800138000"
+  }
+ ]
+}

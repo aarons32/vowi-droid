@@ -1,0 +1,205 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- VowiDroid uses the phone's own SIM. -->
+    <!-- USB SIM readers; phones without USB host support still install VowiDroid. -->
+    <uses-feature
+        android:name="android.hardware.usb.host"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.telephony"
+        android:required="false" />
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <!-- Either one satisfies the connectedDevice foreground-service prerequisite on Android 14. -->
+    <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Asks to be left off battery optimisation: the tunnel and the IMS registration must outlive the screen. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!-- Lists the phone's SIM subscriptions. -->
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <!-- Reading the IMSI/ICCID and running USIM authentication. It is an
+         app-op granted once from root or adb (see SetupActivity); VowiDroid uses
+         no other part of Android telephony. -->
+    <uses-permission
+        android:name="android.permission.USE_ICC_AUTH_WITH_DEVICE_IDENTIFIER"
+        tools:ignore="ProtectedPermissions" />
+
+    <!-- Calls: a self-managed Telecom account (VowiDroid draws its own call
+         screens), the microphone, ringing over the lock screen, and the
+         foreground types for an ongoing call. -->
+    <uses-permission android:name="android.permission.MANAGE_OWN_CALLS" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_PHONE_CALL" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <!-- Names and numbers for calls and conversations. -->
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
+
+    <!-- The database holds SIM identities, session secrets and messages, so it
+         is never backed up or transferred. -->
+    <!-- The ROMs' own settings apps, so the setup page can tell which background-rules page the phone has. -->
+    <queries>
+        <package android:name="com.samsung.android.lool" />
+        <package android:name="com.miui.securitycenter" />
+        <package android:name="com.huawei.systemmanager" />
+        <package android:name="com.coloros.safecenter" />
+        <package android:name="com.oplus.battery" />
+        <package android:name="com.oneplus.security" />
+        <package android:name="com.vivo.permissionmanager" />
+        <package android:name="com.iqoo.secure" />
+        <intent>
+            <action android:name="com.samsung.android.sm.ACTION_BATTERY" />
+        </intent>
+        <intent>
+            <action android:name="miui.intent.action.OP_AUTO_START" />
+        </intent>
+    </queries>
+
+    <application
+        android:name=".VowiApp"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="false"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:localeConfig="@xml/locales_config"
+        android:networkSecurityConfig="@xml/network_security_config"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.VowiDroid"
+        tools:targetApi="33">
+
+        <activity
+            android:name=".ui.MainActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- Offered for "call" and "text" from other apps, e.g. Contacts. -->
+            <intent-filter>
+                <action android:name="android.intent.action.DIAL" />
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="tel" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SENDTO" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="sms" />
+                <data android:scheme="smsto" />
+            </intent-filter>
+            <!-- Text shared from other apps, sent as a text message. -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
+        </activity>
+
+        <!-- Exported only so the launcher shortcut can open it. -->
+        <!-- Plugging in a USB SIM reader offers VowiDroid, which then looks for its card. -->
+        <activity
+            android:name=".UsbReaderActivity"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"
+                android:resource="@xml/usb_sim_readers" />
+        </activity>
+
+        <!-- The home-screen conversations widget. -->
+        <receiver
+            android:name=".widget.ConversationsWidget"
+            android:exported="false"
+            android:label="@string/widget_conversations">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_conversations" />
+        </receiver>
+
+        <service
+            android:name=".widget.ConversationsWidgetService"
+            android:exported="false"
+            android:permission="android.permission.BIND_REMOTEVIEWS" />
+
+        <!-- A conversation in a bubble: embeddable, resizable, one document per conversation. -->
+        <activity
+            android:name=".ui.BubbleActivity"
+            android:allowEmbedded="true"
+            android:documentLaunchMode="always"
+            android:exported="false"
+            android:resizeableActivity="true"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
+            android:name=".SetupActivity"
+            android:exported="true"
+            android:label="@string/setup_title" />
+
+        <!-- The carrier's own page for the emergency (E911) address, after a TS.43 sign-in with the SIM. -->
+        <activity
+            android:name=".ui.EmergencyAddressActivity"
+            android:exported="false"
+            android:label="@string/emergency_address_title" />
+
+        <!-- Its own task, like the stock in-call screen, shown over the lock screen. -->
+        <activity
+            android:name=".telecom.InCallActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:showWhenLocked="true"
+            android:taskAffinity="com.vowi.vowidroid.incall"
+            android:turnScreenOn="true" />
+
+        <service
+            android:name=".telecom.VowiConnectionService"
+            android:exported="true"
+            android:permission="android.permission.BIND_TELECOM_CONNECTION_SERVICE">
+            <intent-filter>
+                <action android:name="android.telecom.ConnectionService" />
+            </intent-filter>
+        </service>
+
+        <receiver
+            android:name=".telecom.CallActionReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".ReplyReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".MarkReadReceiver"
+            android:exported="false" />
+
+        <service
+            android:name=".CoreService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice|phoneCall|microphone" />
+    </application>
+</manifest>

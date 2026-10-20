@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- USB smart-card readers (CCID, interface class 11) hold SIMs VowiDroid can use. -->
+<resources>
+    <usb-device class="11" />
+</resources>

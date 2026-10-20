@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="vowi_blue">#1296DB</color>
+    <color name="launcher_background">#FFFFFF</color>
+
+    <style name="Theme.VowiDroid" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:colorAccent">@color/vowi_blue</item>
+        <item name="android:windowBackground">@android:color/white</item>
+    </style>
+</resources>

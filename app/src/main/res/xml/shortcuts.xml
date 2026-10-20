@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_launcher_foreground"
+        android:shortcutId="sim_setup"
+        android:shortcutShortLabel="@string/shortcut_setup">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetClass="com.vowi.vowidroid.SetupActivity"
+            android:targetPackage="com.vowi.vowidroid" />
+    </shortcut>
+    <!-- Direct Share: recent conversations appear in the share sheet (Android 10+). -->
+    <share-target android:targetClass="com.vowi.vowidroid.ui.MainActivity">
+        <data android:mimeType="text/plain" />
+        <category android:name="com.vowi.vowidroid.category.SHARE_CONVERSATION" />
+    </share-target>
+</shortcuts>
