@@ -100,6 +100,7 @@ class CoreService : Service() {
         }
         when (intent?.action) {
             ACTION_STOP -> {
+                VowiCore.markStoppedByUser()
                 stopSelf()
                 return START_NOT_STICKY
             }

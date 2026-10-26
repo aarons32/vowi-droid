@@ -80,6 +80,14 @@ object VowiCore {
 
     data class Status(val running: Boolean, val detail: String = "")
 
+    /** True from the notification's Stop until the next start, so the screens can offer Start instead of looking empty. */
+    private val mutableUserStopped = MutableStateFlow(false)
+    val userStopped: StateFlow<Boolean> = mutableUserStopped.asStateFlow()
+
+    fun markStoppedByUser() {
+        mutableUserStopped.value = true
+    }
+
     private val mutableStatus = MutableStateFlow(Status(false))
     val status: StateFlow<Status> = mutableStatus.asStateFlow()
 
@@ -101,6 +109,11 @@ object VowiCore {
     private val mutableRegistered = MutableStateFlow<Map<String, String>>(emptyMap())
     val registered: StateFlow<Map<String, String>> = mutableRegistered.asStateFlow()
 
+    /** Direct card access over OMAPI as the last scan saw it; see [OmapiSims]. */
+    data class DirectAccess(val supported: Boolean = false, val connected: Boolean = false, val outcomes: Map<Int, DirectCardOutcome> = emptyMap())
+    private val mutableDirectAccess = MutableStateFlow(DirectAccess())
+    val directAccess: StateFlow<DirectAccess> = mutableDirectAccess.asStateFlow()
+
     /** Set by the call manager; receives network-originated calls. */
     @Volatile
     var incomingCallHandler: ((lineId: String, call: Call) -> Unit)? = null
@@ -112,6 +125,9 @@ object VowiCore {
     private lateinit var networks: NetworkTracker
     private val lineNetworks = ConcurrentHashMap<String, LineNetwork>()
     private lateinit var usbReaders: UsbSimReaders
+
+    /** The SIM slots over the cards' own OMAPI channels, for cards whose access rules trust VowiDroid; null when the phone has none. */
+    private var omapi: DirectSims? = null
     private val engines = ConcurrentHashMap<String, WifiCallingEngine>()
 
     /** Each line's card as the last scan found it; a line whose card is not in has no entry. */
@@ -143,6 +159,9 @@ object VowiCore {
     private var lastScan: Seen? = null
     private val states = ConcurrentHashMap<String, LineState>()
     private const val WORKER_NAME = "vowi-core"
+
+    /** The phase of every line while VowiDroid is stopped. */
+    const val PHASE_STOPPED = "stopped"
     private val worker = Executors.newSingleThreadExecutor { Thread(it, WORKER_NAME).apply { isDaemon = true } }
     private val assembler = SmsAssembler()
 
@@ -154,6 +173,7 @@ object VowiCore {
     @Synchronized
     fun start(context: Context) {
         if (started) return
+        mutableUserStopped.value = false
         app = context.applicationContext
         CarrierProfiles.install { app.assets.open("carrier_profiles.json") }
         SmsCenters.install { app.assets.open("sms_centers.json") }
@@ -166,6 +186,7 @@ object VowiCore {
             worker.execute { lineNetworks.forEach { (id, line) -> if (line.changedSinceBound()) { line.forget(); engines[id]?.networkChanged() } } }
         }
         usbReaders = UsbSimReaders(app) { rescan() }
+        omapi = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && DirectCardAccess.supported(app)) OmapiSims(app) { rescan() } else null
         started = true
         mutableStatus.value = Status(true)
         loadVoicemail()
@@ -180,6 +201,7 @@ object VowiCore {
             refreshConversationsNow()
         }
         usbReaders.start()
+        omapi?.start()
     }
 
     /**
@@ -208,8 +230,10 @@ object VowiCore {
         running.clear()
         placed.clear()
         usbReaders.close()
+        omapi?.close()
         networks.close()
         mutableStatus.value = Status(false)
+        mutableDirectAccess.value = DirectAccess()
         mutableRegistered.value = emptyMap()
         refreshLinesNow()
     }
@@ -230,8 +254,9 @@ object VowiCore {
             sim = object : WifiCallingEngine.SimSource {
                 override fun identity(): SimIdentity {
                     val saved = lineStore.all().firstOrNull { it.id == lineId }
-                    val identity = when (val location = placed[lineId]?.location ?: throw SimCardException("the SIM card is not in")) {
-                        is SimLocation.PhoneSlot -> sims.identity(location.slot, saved?.subscriptionId ?: -1)
+                    val card = placed[lineId] ?: throw SimCardException("the SIM card is not in")
+                    val identity = when (val location = card.location) {
+                        is SimLocation.PhoneSlot -> if (card.direct) direct().identity(location.slot) else sims.identity(location.slot, saved?.subscriptionId ?: -1)
                         is SimLocation.UsbReader -> usbReaders.identity(location.device)
                     }
                     val expected = saved?.imsi
@@ -240,15 +265,20 @@ object VowiCore {
                         rescan()
                         throw CardChangedException()
                     }
-                    return identity
+                    // The device identity is the line's own setting, whatever the card.
+                    return identity.copy(imei = saved?.imei?.trim().orEmpty())
                 }
 
                 override val aka: AkaProvider = object : AkaProvider {
-                    override fun authenticate(identity: SimIdentity, challenge: AkaChallenge): AkaResult =
-                        when (val location = placed[lineId]?.location ?: throw AkaException("the SIM card is not in")) {
-                            is SimLocation.PhoneSlot -> sims.authenticate(location.slot, lineStore.all().firstOrNull { it.id == lineId }?.subscriptionId ?: -1, challenge)
+                    override fun authenticate(identity: SimIdentity, challenge: AkaChallenge): AkaResult {
+                        val card = placed[lineId] ?: throw AkaException("the SIM card is not in")
+                        return when (val location = card.location) {
+                            is SimLocation.PhoneSlot ->
+                                if (card.direct) direct().authenticate(location.slot, identity.iccid, challenge)
+                                else sims.authenticate(location.slot, lineStore.all().firstOrNull { it.id == lineId }?.subscriptionId ?: -1, challenge)
                             is SimLocation.UsbReader -> usbReaders.authenticate(location.device, identity.iccid, challenge)
                         }
+                    }
                 }
 
                 // The user's own entry first, then the SIM's number, then the carrier's usual one.
@@ -260,6 +290,9 @@ object VowiCore {
             listener = engineListener,
         )
     }
+
+    /** The OMAPI side, for a card that was read over its own channel. */
+    private fun direct(): DirectSims = omapi ?: throw SimCardException("direct card access is not available on this phone")
 
     /**
      * Finds every card in the phone's slots and the USB readers, ties each
@@ -360,10 +393,17 @@ object VowiCore {
                         description += if (ids != null) ", answers through an old subscription" else ", silent through ${remembered.size} old subscription(s)"
                     }
                 }
+                // When the phone will not read the card, a card whose access rules trust VowiDroid, as a removable
+                // eSIM can, still answers over its own OMAPI channel, switched off in Android's settings or not.
+                val direct = if (ids == null) omapi?.takeIf { it.connected }?.readCard(slot.slot, slot.label) else null
                 if (ids != null) {
                     found += FoundCard(location, ids.imsi, ids.iccid, slot.label, subscriptionId = ids.subscriptionId)
                     if (!probed) description += ", readable"
+                } else if (direct != null) {
+                    found += direct
+                    description += if (direct.readable) ", readable over its own channel" else ", locked, over its own channel"
                 } else {
+                    omapi?.takeIf { it.connected }?.outcomes?.get(slot.slot)?.let { description += ", own channel: ${it.name.lowercase()}" }
                     when (access) {
                         SimAccess.ISSUE_PERMISSION -> PermissionDenials.report(AppPermissions.Need.PHONE, R.string.denial_sim_read)
                         SimAccess.ISSUE_ACCESS -> PermissionDenials.report(AppPermissions.Need.SIM_ACCESS, R.string.denial_sim_read)
@@ -387,6 +427,7 @@ object VowiCore {
             readerCards = readers.mapNotNull { it.card?.iccid?.takeIf { iccid -> iccid.isNotEmpty() } }.toSet(),
             airplane = airplane,
         )
+        mutableDirectAccess.value = DirectAccess(omapi != null, omapi?.connected == true, omapi?.outcomes.orEmpty())
         return found
     }
 
@@ -592,7 +633,8 @@ object VowiCore {
 
     private fun refreshLinesNow() {
         if (!started) {
-            mutableLines.value = emptyList()
+            // Stopped, not gone: the saved lines stay on the screens, marked as such, until the next start.
+            mutableLines.value = if (::lineStore.isInitialized && ::app.isInitialized) lineStore.all().map(::stoppedLine) else emptyList()
             return
         }
         val airplane = runCatching { sims.airplaneMode() }.getOrDefault(false)
@@ -635,6 +677,7 @@ object VowiCore {
                 network = state?.network.orEmpty(),
                 smsCenter = state?.smsCenter.orEmpty(),
                 smsCenterFrom = state?.smsCenterFrom.orEmpty(),
+                imei = config.imei.orEmpty(),
                 present = card != null,
                 location = location?.let(::placeName) ?: assumedPlace,
                 lastSeen = placeName(config.lastSeen),
@@ -650,6 +693,27 @@ object VowiCore {
         }
     }
 
+    /** A saved line as the screens show it while VowiDroid is stopped. */
+    private fun stoppedLine(config: LineConfig): Line = Line(
+        id = config.id,
+        name = config.name,
+        kind = if (config.lastSeen?.startsWith("usb:") == true) Line.Kind.USB_READER else Line.Kind.PHONE_SIM,
+        wifiCallingEnabled = config.enabled,
+        phase = PHASE_STOPPED,
+        registered = false,
+        smsReady = false,
+        phoneNumber = "",
+        epdg = "",
+        carrierProfile = "",
+        lastError = "",
+        iccid = config.iccid.orEmpty(),
+        imei = config.imei.orEmpty(),
+        present = false,
+        lastSeen = placeName(config.lastSeen),
+        sim = Line.SimStatus.UNAVAILABLE,
+        simReason = PHASE_STOPPED,
+    )
+
     fun setWifiCalling(id: String, enabled: Boolean) = onWorker {
         if (lineStore.all().none { it.id == id }) throw IOException("unknown line $id")
         lineStore.setEnabled(id, enabled)
@@ -658,6 +722,21 @@ object VowiCore {
 
     fun reconnect(id: String) {
         engines[id]?.reconnect() ?: throw IOException("unknown line $id")
+    }
+
+    /** Sets the line's device identity (IMEI, 15 digits, or "" for none) and reconnects a running line so the ePDG and the IMS core see it. */
+    fun setImei(id: String, imei: String) = onWorker {
+        if (lineStore.all().none { it.id == id }) throw IOException("unknown line $id")
+        lineStore.update(id) { it.copy(imei = imei.trim()) }
+        refreshLinesNow()
+        if (id in running) engines[id]?.reconnect()
+    }
+
+    /** The phone's own IMEI for the slot the line's card is in (the first slot for a reader), or "" when Android will not give it. */
+    fun phoneImei(id: String): String {
+        if (!started) return ""
+        val slot = (placed[id]?.location as? SimLocation.PhoneSlot)?.slot ?: 0
+        return sims.imei(slot)
     }
 
     /**

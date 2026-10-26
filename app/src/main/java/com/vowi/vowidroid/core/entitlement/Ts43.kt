@@ -169,7 +169,7 @@ class EntitlementException(
 /** What one query carries about this device; the server may show some of it on its page. */
 data class EntitlementRequest(
     val serverUrl: String,
-    /** This device's ID at the server. TS.43 names the IMEI; Android does not give apps the IMEI, so VowiDroid sends its own stable ID. */
+    /** This device's ID at the server. TS.43 names the IMEI; VowiDroid sends its own stable ID instead, so the phone's IMEI stays out of entitlement traffic. */
     val terminalId: String,
     val terminalVendor: String,
     val terminalModel: String,

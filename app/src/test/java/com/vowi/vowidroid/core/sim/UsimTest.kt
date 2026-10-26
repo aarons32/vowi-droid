@@ -25,6 +25,8 @@ class UsimTest {
         private val master = HashMap<Int, File>()
         private val usim = HashMap<Int, File>()
         private var inUsim = false
+        /** An application was selected on this channel, so 7FFF leads back to it even from under the MF. */
+        private var appSelected = false
         private var selected: File? = null
         val calls = ArrayList<ByteArray>()
         var authenticate: (ByteArray) -> ApduResponse = { ApduResponse(ByteArray(0), 0x9862) }
@@ -61,12 +63,20 @@ class UsimTest {
             if (p1 == 0x04) {
                 if (!hasUsim || !data.toList().take(7).toByteArray().contentEquals(USIM_AID.copyOf(7))) return ApduResponse(ByteArray(0), 0x6a82)
                 inUsim = true
+                appSelected = true
                 selected = null
                 return ApduResponse(ByteArray(0), 0x9000)
             }
             val id = ((data[0].toInt() and 0xff) shl 8) or (data[1].toInt() and 0xff)
             if (id == 0x3f00) {
                 inUsim = false
+                selected = null
+                return ApduResponse(ByteArray(0), 0x9000)
+            }
+            if (id == 0x7fff) {
+                // The channel's application by its reserved file ID; only meaningful once one was selected.
+                if (!hasUsim || !appSelected) return ApduResponse(ByteArray(0), 0x6a82)
+                inUsim = true
                 selected = null
                 return ApduResponse(ByteArray(0), 0x9000)
             }
@@ -157,6 +167,31 @@ class UsimTest {
         }
         assertEquals("310260123456789", Usim.readIdentity(card).imsi)
         assertTrue("no bare VERIFY is sent to a card that reads fine", card.inner.calls.none { it[1].toInt() and 0xff == 0x20 })
+    }
+
+    @Test
+    fun aChannelOpenedOnTheUsimIsReEnteredByFileIdNotByName() {
+        // Android's OMAPI opens the channel on the USIM itself and refuses SELECT by DF name on it.
+        val inner = VirtualUicc("8901260012345678901", "310260123456789", "310260", spn = "T-Mobile")
+        inner.transmit(byteArrayOf(0x00, 0xa4.toByte(), 0x04, 0x04, 7) + VirtualUicc.USIM_AID.copyOf(7) + byteArrayOf(0x00))
+        val opened = inner.calls.size
+        val channel = object : UsimChannel {
+            override fun transmit(command: ByteArray): ApduResponse {
+                if (command[1].toInt() and 0xff == 0xa4 && command[2].toInt() == 0x04) throw SecurityException("SELECT by DF name command is not allowed")
+                return inner.transmit(command)
+            }
+        }
+        val identity = Usim.readIdentity(channel)
+        assertEquals("8901260012345678901", identity.iccid)
+        assertEquals("310260123456789", identity.imsi)
+        assertEquals("T-Mobile", identity.spn)
+        inner.authenticate = { ApduResponse(byteArrayOf(0xdb.toByte(), 8) + ByteArray(8) { 1 } + byteArrayOf(16) + ByteArray(16) { 2 } + byteArrayOf(16) + ByteArray(16) { 3 }, 0x9000) }
+        val result = Usim.authenticate(channel, AkaChallenge(ByteArray(16), ByteArray(16)), expectedIccid = "8901260012345678901")
+        assertArrayEquals(ByteArray(16) { 2 }, result.ck)
+        // Everything after the channel was opened went by file ID; the USIM was re-entered through 7FFF.
+        val later = inner.calls.drop(opened)
+        assertTrue(later.none { it[1].toInt() and 0xff == 0xa4 && it[2].toInt() == 0x04 })
+        assertTrue(later.any { it[1].toInt() and 0xff == 0xa4 && it.size >= 7 && it[5].toInt() == 0x7f && it[6].toInt() and 0xff == 0xff })
     }
 
     @Test

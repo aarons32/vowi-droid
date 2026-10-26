@@ -24,6 +24,8 @@ object VowiRepository {
 
     suspend fun refreshLines() = withContext(Dispatchers.IO) { VowiCore.refreshLines() }
 
+    suspend fun setImei(id: String, imei: String) = withContext(Dispatchers.IO) { VowiCore.setImei(id, imei) }
+
     suspend fun refreshConversations() = withContext(Dispatchers.IO) { VowiCore.refreshConversations() }
 
     /** Loads a conversation, oldest first; its inbound texts are marked read. */

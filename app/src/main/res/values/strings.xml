@@ -579,4 +579,33 @@
         <item quantity="one">%d call</item>
         <item quantity="other">%d calls</item>
     </plurals>
+
+    <!-- Direct card access over OMAPI (Settings → Advanced) -->
+    <string name="settings_card_access">Direct card access</string>
+    <string name="settings_card_access_unsupported">This phone offers no OMAPI channel to its SIM slots</string>
+    <string name="settings_card_access_connecting">Waiting for Android\'s secure element service</string>
+    <string name="settings_card_access_idle">Used when Android will not read a SIM; no card has needed it yet</string>
+    <string name="settings_card_access_granted">Allowed by the card in %1$s</string>
+    <string name="settings_card_access_denied">Refused by the card in %1$s</string>
+    <string name="settings_card_access_body">A removable eSIM (eUICC) can let VowiDroid read it and answer authentication over its own channel, the way eSIM manager apps reach it. That keeps working while the SIM is switched off in Android\'s settings, and needs no adb step.\n\nThe card decides. A card without access rules is allowed on phones that follow Android\'s default. A card that carries access rules (ARA-M) must list the SHA-1 of this build\'s signing certificate in them; cards whose owner can edit the rules, such as eSTK.me, take this value:</string>
+    <string name="settings_card_access_copy">Copy hash</string>
+    <string name="settings_card_access_copied">Hash copied</string>
+    <string name="action_close">Close</string>
+
+    <!-- Line settings: device identity (IMEI) -->
+    <string name="line_imei_title">Device identity (IMEI)</string>
+    <string name="line_imei_body">Some carriers ask the ePDG for the phone\'s IMEI and allow Wi-Fi calling only for devices they know. VowiDroid sends this value when asked, once the ePDG has proven itself, and names the line\'s SIP instance with it. Leave it empty to send none.</string>
+    <string name="line_imei_hint">15 digits</string>
+    <string name="line_imei_not_set">Not set · none is sent</string>
+    <string name="line_imei_generate">Generate</string>
+    <string name="line_imei_use_phone">This phone\'s</string>
+    <string name="line_imei_clear">Clear</string>
+    <string name="line_imei_invalid">Enter 15 digits</string>
+    <string name="line_imei_check">The check digit does not match; carriers may reject it</string>
+
+    <!-- Stopped from the notification -->
+    <string name="stopped_title">WiFi Calling is stopped</string>
+    <string name="stopped_body">You stopped VowiDroid from its notification. Your lines are kept; start it again to connect them.</string>
+    <string name="stopped_action">Start</string>
+    <string name="line_status_stopped">Stopped · VowiDroid is not running</string>
 </resources>

@@ -26,6 +26,8 @@ data class LineConfig(
     val ejected: Boolean = false,
     /** Where the card was last seen (SimLocation.tag), e.g. "slot:2". */
     val lastSeen: String? = null,
+    /** The device identity (IMEI) sent to the ePDG when it asks, and the SIP instance; null or empty sends none. */
+    val imei: String? = null,
 )
 
 /** The user's lines, kept in preferences as JSON. */

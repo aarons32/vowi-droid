@@ -1,5 +1,6 @@
 package com.vowi.vowidroid.core.sim
 
+import com.vowi.vowidroid.core.util.hexToBytes
 import com.vowi.vowidroid.core.util.toHex
 
 /** The card wants its PIN before it shares its files. [tries] is how many attempts remain, or -1. */
@@ -13,6 +14,16 @@ class UsimUnavailableException : SimCardException("the card has no USIM applicat
 
 /** The card in a slot or reader is no longer the one VowiDroid was using. */
 class CardChangedException : SimCardException("a different SIM card is in its place")
+
+/** The card's access rules (ARA-M) do not list VowiDroid, so Android's OMAPI refused a channel to it. */
+class CardAccessDeniedException : SimCardException("the card's access rules do not list VowiDroid")
+
+/**
+ * A card reached over a channel that Android opened on the USIM already, as
+ * OMAPI does. SELECT by DF name is not allowed on such a channel, so the USIM
+ * is re-entered through its reserved file ID 7FFF (TS 102 221 §8.4.1).
+ */
+interface UsimChannel : SmartCard
 
 /**
  * What VowiDroid reads from a USIM over APDUs (3GPP TS 102 221, TS 31.102):
@@ -30,8 +41,12 @@ object Usim {
         return value
     }
 
-    /** Finds the USIM in EF_DIR and selects it; returns its AID. */
+    /** Finds the USIM in EF_DIR and selects it; returns its AID. A [UsimChannel] is already on the USIM and is re-entered instead. */
     fun selectUsim(card: SmartCard): ByteArray {
+        if (card is UsimChannel) {
+            selectAdf(card)
+            return USIM_AID_PREFIX.hexToBytes()
+        }
         selectMf(card)
         selectFile(card, 0x2f, 0x00, "EF_DIR")
         var aid: ByteArray? = null
@@ -122,7 +137,13 @@ object Usim {
     }
 
     private fun selectApplication(card: SmartCard, aid: ByteArray) {
+        if (card is UsimChannel) return selectAdf(card)
         require(card.transmit(byteArrayOf(0x00, 0xa4.toByte(), 0x04, 0x04, aid.size.toByte()) + aid + byteArrayOf(0x00)), "select the USIM")
+    }
+
+    /** Re-enters the application the channel was opened on: 7FFF names the current ADF on every UICC. */
+    private fun selectAdf(card: SmartCard) {
+        require(card.transmit(byteArrayOf(0x00, 0xa4.toByte(), 0x00, 0x04, 0x02, 0x7f, 0xff.toByte(), 0x00)), "select the USIM")
     }
 
     private fun readBinary(card: SmartCard, length: Int): ByteArray {

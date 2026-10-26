@@ -1,5 +1,6 @@
 package com.vowi.vowidroid.ui.settings
 
+import com.vowi.vowidroid.core.sim.Imei
 import com.vowi.vowidroid.core.sim.SimCards
 import android.widget.Toast
 import androidx.compose.foundation.clickable
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -43,6 +45,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
@@ -96,6 +99,7 @@ fun LineScreen(lineId: String, onBack: () -> Unit, onForwarding: (String) -> Uni
     var chooseNetwork by remember { mutableStateOf(false) }
     var smsCenter by remember(lineId) { mutableStateOf("") }
     var editSmsCenter by remember { mutableStateOf(false) }
+    var editImei by remember { mutableStateOf(false) }
     // A changed identity setting only shows on the next sign-in, so the line reconnects right away.
     val setImsiPrivacy: (Boolean) -> Unit = { enabled ->
         imsiPrivacy = enabled
@@ -268,6 +272,13 @@ fun LineScreen(lineId: String, onBack: () -> Unit, onForwarding: (String) -> Uni
                     }
                 },
                 trailingContent = { Switch(checked = imsiPrivacy, onCheckedChange = { setImsiPrivacy(it) }) },
+            )
+            // Some ePDGs ask for the IMEI and admit only devices they know; the line carries whichever one the user chose.
+            ListItem(
+                modifier = Modifier.clickable { editImei = true },
+                leadingContent = { Icon(Icons.Filled.PhoneAndroid, contentDescription = null) },
+                headlineContent = { Text(stringResource(R.string.line_imei_title)) },
+                supportingContent = { Text(line.imei.ifEmpty { stringResource(R.string.line_imei_not_set) }) },
             )
             HorizontalDivider()
             // Texting, as the stock Messages app keeps it per SIM: the SMS center VowiDroid sends through.
@@ -452,6 +463,48 @@ fun LineScreen(lineId: String, onBack: () -> Unit, onForwarding: (String) -> Uni
                 }) { Text(stringResource(R.string.action_save)) }
             },
             dismissButton = { TextButton(onClick = { editSmsCenter = false }) { Text(stringResource(R.string.action_cancel)) } },
+        )
+    }
+    if (editImei && line != null) {
+        var entered by remember { mutableStateOf(line.imei) }
+        val phoneImei = remember(line.id) { VowiCore.phoneImei(line.id) }
+        val digits = Imei.normalize(entered)
+        val wellFormed = digits.isEmpty() || Imei.isWellFormed(digits)
+        val checkDigitOff = digits.isNotEmpty() && wellFormed && !Imei.checkDigitMatches(digits)
+        AlertDialog(
+            onDismissRequest = { editImei = false },
+            title = { Text(stringResource(R.string.line_imei_title)) },
+            text = {
+                Column {
+                    Text(stringResource(R.string.line_imei_body), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    OutlinedTextField(
+                        value = entered,
+                        onValueChange = { entered = it },
+                        placeholder = { Text(stringResource(R.string.line_imei_hint)) },
+                        singleLine = true,
+                        isError = !wellFormed,
+                        supportingText = when {
+                            !wellFormed -> ({ Text(stringResource(R.string.line_imei_invalid)) })
+                            checkDigitOff -> ({ Text(stringResource(R.string.line_imei_check)) })
+                            else -> null
+                        },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                    )
+                    Row(modifier = Modifier.padding(top = 4.dp)) {
+                        TextButton(onClick = { entered = Imei.generate() }) { Text(stringResource(R.string.line_imei_generate)) }
+                        if (phoneImei.isNotEmpty()) TextButton(onClick = { entered = phoneImei }) { Text(stringResource(R.string.line_imei_use_phone)) }
+                        if (entered.isNotEmpty()) TextButton(onClick = { entered = "" }) { Text(stringResource(R.string.line_imei_clear)) }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(enabled = wellFormed, onClick = {
+                    scope.launch { runCatching { VowiRepository.setImei(line.id, digits) } }
+                    editImei = false
+                }) { Text(stringResource(R.string.action_save)) }
+            },
+            dismissButton = { TextButton(onClick = { editImei = false }) { Text(stringResource(R.string.action_cancel)) } },
         )
     }
     if (confirmRemove && line != null) {

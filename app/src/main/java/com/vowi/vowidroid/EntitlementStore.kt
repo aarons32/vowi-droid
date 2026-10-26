@@ -30,7 +30,7 @@ object EntitlementStore {
 
     private fun preferences(context: Context): SharedPreferences = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
 
-    /** This installation's ID at entitlement servers: TS.43 names the IMEI, which apps cannot read, so a UUID stands in. */
+    /** This installation's ID at entitlement servers: TS.43 names the IMEI, but VowiDroid keeps the phone's IMEI out of entitlement traffic, so a UUID stands in. */
     fun terminalId(context: Context): String = synchronized(this) {
         val preferences = preferences(context)
         preferences.getString(KEY_TERMINAL_ID, null)?.takeIf { it.isNotBlank() } ?: UUID.randomUUID().toString().also {

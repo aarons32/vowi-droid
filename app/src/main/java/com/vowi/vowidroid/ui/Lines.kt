@@ -42,6 +42,8 @@ import com.vowi.vowidroid.PermissionDenials
 import com.vowi.vowidroid.R
 import com.vowi.vowidroid.SetupActivity
 import com.vowi.vowidroid.data.Line
+import com.vowi.vowidroid.CoreService
+import com.vowi.vowidroid.VowiCore
 import com.vowi.vowidroid.data.VowiRepository
 import java.time.Instant
 import java.time.LocalDate
@@ -243,4 +245,40 @@ object TimeFormat {
     fun duration(seconds: Long): String =
         if (seconds >= 3600) "%d:%02d:%02d".format(seconds / 3600, seconds % 3600 / 60, seconds % 60)
         else "%d:%02d".format(seconds / 60, seconds % 60)
+}
+
+/**
+ * Shown after the user stopped VowiDroid from its notification: the lines
+ * stay listed, and this is how they come back. Nothing while VowiDroid runs
+ * or is only starting up.
+ */
+@Composable
+fun StoppedCard(modifier: Modifier = Modifier) {
+    val status by VowiCore.status.collectAsStateWithLifecycle()
+    val userStopped by VowiCore.userStopped.collectAsStateWithLifecycle()
+    if (status.running || !userStopped) return
+    val context = LocalContext.current
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            Row {
+                Icon(Icons.Filled.WifiCalling3, contentDescription = null)
+                Text(
+                    stringResource(R.string.stopped_title),
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.padding(start = 12.dp),
+                )
+            }
+            Text(
+                stringResource(R.string.stopped_body),
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+            TextButton(onClick = { CoreService.start(context) }, modifier = Modifier.padding(top = 4.dp)) {
+                Text(stringResource(R.string.stopped_action))
+            }
+        }
+    }
 }

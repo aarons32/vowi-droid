@@ -241,7 +241,7 @@ class WifiCallingEngine(
             stage = STAGE_TUNNEL
             update { it.copy(stage = stage) }
             val connector = TunnelConnector(network.resolver(), addressMemory)
-            val params = TunnelParams(identity, profile, epdg, sim.aka, bindSocket = network::bind, plainIdentity = !listener.imsiPrivacyEnabled(lineId))
+            val params = TunnelParams(identity, profile, epdg, sim.aka, imei = identity.imei, bindSocket = network::bind, plainIdentity = !listener.imsiPrivacyEnabled(lineId))
             val handshake = connector.connect(params) { !enabled || generation.get() != attemptGeneration }
             val tunnelSettings = profile.tunnel
             val session = IkeSession(

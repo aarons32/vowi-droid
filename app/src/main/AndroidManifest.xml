@@ -11,6 +11,11 @@
         android:name="android.hardware.telephony"
         android:required="false" />
 
+    <!-- OMAPI channels to the SIM slots: how a removable eSIM that trusts VowiDroid is read while switched off in Android. -->
+    <uses-feature
+        android:name="android.hardware.se.omapi.uicc"
+        android:required="false" />
+
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />

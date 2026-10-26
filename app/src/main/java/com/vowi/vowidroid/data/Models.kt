@@ -31,6 +31,8 @@ data class Line(
     /** The SMS center the SIM or the carrier profile gave, before the user's own entry; and which of them: "sim" or "profile". */
     val smsCenter: String = "",
     val smsCenterFrom: String = "",
+    /** The line's device identity (IMEI) as the user set it, or "". */
+    val imei: String = "",
     /** The line's card was found in a slot or reader. */
     val present: Boolean,
     /** Where the card is, e.g. "SIM slot 1" or a reader's name; empty when it is not in. */

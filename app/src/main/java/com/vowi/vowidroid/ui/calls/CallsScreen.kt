@@ -80,6 +80,8 @@ import com.vowi.vowidroid.ui.LinePreferences
 import com.vowi.vowidroid.ui.LineStatusCard
 import com.vowi.vowidroid.ui.NoLineCard
 import com.vowi.vowidroid.ui.PermissionCard
+import com.vowi.vowidroid.ui.StoppedCard
+import com.vowi.vowidroid.VowiCore
 import com.vowi.vowidroid.ui.TimeFormat
 import com.vowi.vowidroid.ui.components.Actions
 import com.vowi.vowidroid.ui.components.Avatar
@@ -113,6 +115,8 @@ fun CallsScreen(
     val calls by CallLogStore.calls.collectAsStateWithLifecycle()
     val allLines by VowiRepository.lines.collectAsStateWithLifecycle()
     val lines = usableLines()
+    // While the user has VowiDroid stopped, the stopped card explains the empty list; the no-line card would mislead.
+    val userStopped by VowiCore.userStopped.collectAsStateWithLifecycle()
     val call = rememberCallLauncher()
     var dialpad by rememberSaveable { mutableStateOf(false) }
     var initialNumber by rememberSaveable { mutableStateOf("") }
@@ -180,9 +184,10 @@ fun CallsScreen(
         val shown = if (missedOnly) calls.filter { it.outcome == CallRecord.Outcome.MISSED } else calls
         LazyColumn(modifier = Modifier.fillMaxSize().padding(padding)) {
             // Nothing while no permission is missing and every line is registered; the cards decide.
+            item { StoppedCard(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
             item { PermissionCard(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
             item { LineStatusCard(onOpenLine, Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
-            if (lines.isEmpty()) {
+            if (lines.isEmpty() && !userStopped) {
                 item { NoLineCard(onSettings, Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
             }
             // Voicemail waiting, as AOSP's dialer shows it above the call history.

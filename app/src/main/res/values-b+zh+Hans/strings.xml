@@ -559,4 +559,33 @@
     <plurals name="a11y_calls">
         <item quantity="other">%d 次通话</item>
     </plurals>
+
+    <!-- Direct card access over OMAPI (Settings → Advanced) -->
+    <string name="settings_card_access">直接读卡</string>
+    <string name="settings_card_access_unsupported">此手机不提供通往 SIM 卡槽的 OMAPI 通道</string>
+    <string name="settings_card_access_connecting">正在等待 Android 的安全元件服务</string>
+    <string name="settings_card_access_idle">当 Android 不读取 SIM 卡时使用；目前还没有卡需要它</string>
+    <string name="settings_card_access_granted">%1$s 中的卡已允许</string>
+    <string name="settings_card_access_denied">%1$s 中的卡已拒绝</string>
+    <string name="settings_card_access_body">可插拔 eSIM（eUICC）可以让 VowiDroid 通过它自己的通道读取信息并完成鉴权，就像 eSIM 管理应用那样。即使在 Android 设置中关闭了这张 SIM 卡，它仍然可用，也无需 adb 步骤。\n\n由卡来决定。没有访问规则的卡在遵循 Android 默认策略的手机上会被允许。带有访问规则（ARA-M）的卡必须在规则中列出本版本签名证书的 SHA-1；允许用户编辑规则的卡（例如 eSTK.me）需要填入以下值：</string>
+    <string name="settings_card_access_copy">复制哈希</string>
+    <string name="settings_card_access_copied">已复制哈希</string>
+    <string name="action_close">关闭</string>
+
+    <!-- Line settings: device identity (IMEI) -->
+    <string name="line_imei_title">设备标识（IMEI）</string>
+    <string name="line_imei_body">部分运营商会通过 ePDG 询问手机的 IMEI，只允许它们认识的设备使用 WiFi 通话。VowiDroid 会在被询问且 ePDG 已通过验证后发送此值，并用它命名该线路的 SIP 实例。留空则不发送。</string>
+    <string name="line_imei_hint">15 位数字</string>
+    <string name="line_imei_not_set">未设置 · 不发送</string>
+    <string name="line_imei_generate">生成</string>
+    <string name="line_imei_use_phone">本机的</string>
+    <string name="line_imei_clear">清除</string>
+    <string name="line_imei_invalid">请输入 15 位数字</string>
+    <string name="line_imei_check">校验位不匹配，运营商可能会拒绝</string>
+
+    <!-- Stopped from the notification -->
+    <string name="stopped_title">WiFi 通话已停止</string>
+    <string name="stopped_body">你已通过通知停止了 VowiDroid。线路仍会保留，重新启动即可再次连接。</string>
+    <string name="stopped_action">启动</string>
+    <string name="line_status_stopped">已停止 · VowiDroid 未运行</string>
 </resources>

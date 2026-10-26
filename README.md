@@ -157,6 +157,27 @@ also gives VowiDroid the reader; otherwise **Add a line** asks for access.
 Then add the SIM as above. A SIM in a reader also gives up its SMS centre
 number, which the phone's own SIM cannot.
 
+### Removable eSIM cards
+
+A removable eSIM (an eUICC on a plastic card, such as 9eSIM or eSTK.me)
+presents the profile you enabled with EasyEUICC or OpenEUICC as an ordinary
+USIM, so it works in a phone slot or a USB reader like any SIM. Only the
+enabled profile is visible, and each profile is its own line.
+
+Such a card can also let VowiDroid read it over the card's own channel
+(Android's Open Mobile API), the way eSIM manager apps reach it. That channel
+keeps working after you switch the SIM off in Android's settings, so the
+phone stays off the cellular network while VowiDroid keeps the line
+registered over Wi-Fi, and it needs no adb step. The card decides. A card
+with no access rules at all is allowed on phones that follow Android's
+default; a 9eSIM carrying a T-Mobile profile worked that way on a Xiaomi,
+with the line registered seconds after the SIM was switched off. A card that
+carries access rules (ARA-M) must list the SHA-1 of VowiDroid's signing
+certificate in them, which **Settings → Advanced → Direct card access** shows
+along with the state of each slot; cards that list only the EasyEUICC hash
+refuse other apps, and cards whose owner can edit the rules, such as
+eSTK.me, take the hash from that screen.
+
 ### When a line does not connect
 
 The status card names the step that failed and the reason, and counts down
@@ -166,6 +187,11 @@ to the next attempt (10 s, then 20 s, then every 30 s). The usual causes:
   not reachable from this network. Some carriers answer only from their home
   country; a VPN with an exit there works, with the line's **Network** set
   to Automatic or VPN only.
+- **A bare private code such as 16377, right after IKE_SA_INIT**: some
+  carriers ask the ePDG for the phone's IMEI and allow only devices they
+  know. Set one under the line's **Device identity (IMEI)**: the phone's own,
+  one you type, or a generated one. The log then says whether the ePDG asked
+  and what was sent.
 - **"refused by the carrier"**: the ePDG turned the subscriber away (TS
   24.302, e.g. NON_3GPP_ACCESS_TO_EPC_NOT_ALLOWED). The line is not
   provisioned for Wi-Fi calling, or the carrier does not allow it from this
@@ -200,10 +226,13 @@ service centre refuses shows as not sent with the centre's reason and a
 "Check SMS center" link to the line's settings.
 
 **Each line's settings** (tap the line under Settings): rename, eject the
-SIM, the network the tunnel uses, Hide the IMSI, caller ID, voicemail
-number, call forwarding, the emergency address, the SMS centre, the line's
-notification categories, and the details of the last connection (state,
-ePDG, carrier profile, network, identity, last error and its code).
+SIM, the network the tunnel uses, Hide the IMSI, the device identity (an
+IMEI: the phone's own, one you type, or a generated one; sent to the ePDG
+when it asks, once the ePDG has proven itself, and used as the line's SIP
+instance), caller ID, voicemail number, call forwarding, the emergency
+address, the SMS centre, the line's notification categories, and the
+details of the last connection (state, ePDG, carrier profile, network,
+identity, last error and its code).
 
 **Settings** also has the default line for calls and texts, call waiting,
 whether calls show in the phone's history, blocked numbers, quick responses,
@@ -253,6 +282,10 @@ page until *Settings → Notifications → Advanced settings → Manage
 notification categories for each app* is turned on, so on a Galaxy the rows
 in VowiDroid are the way in.
 
+The notification's **Stop** action stops VowiDroid. The lines stay listed,
+marked as stopped, and a card at the top of the Phone and Messages screens
+offers **Start**; opening the app afresh starts it as well.
+
 ### The emergency address (E911)
 
 US carriers must know where a Wi-Fi call comes from, so that a 911 call
@@ -280,6 +313,7 @@ Compose UI ───────────────────▶ VowiCore
 CallManager (Telecom) ────────▶   ├─ WifiCallingEngine, one per line
 CoreService (foreground) ─────▶   │    ├─ CarrierProfiles (assets/carrier_profiles.json)
 PhoneSims (TelephonyManager) ─┐   │    ├─ TunnelConnector → IkeHandshake → IkeSession
+OmapiSims (OMAPI channel) ────┤   │    │
 UsbSimReaders (USB CCID) ─────┴──▶│    │     ESP dataplane → NetStack (own IP stack) + ipsec-3gpp
   identity + AKA                  │    ├─ ImsSession (REGISTER, refresh, dispatch)
                                   │    ├─ SmsOverIms, UssdRuntime, voicemail subscription

@@ -2,6 +2,8 @@ package com.vowi.vowidroid.ui.settings
 
 import com.vowi.vowidroid.core.sim.SimCards
 import androidx.compose.material.icons.filled.Usb
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Intent
 import android.widget.Toast
 import androidx.compose.foundation.clickable
@@ -52,6 +54,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -62,6 +65,9 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.vowi.vowidroid.AppLanguage
 import com.vowi.vowidroid.AppPermissions
+import com.vowi.vowidroid.DirectCardAccess
+import com.vowi.vowidroid.DirectCardOutcome
+import com.vowi.vowidroid.VowiCore
 import com.vowi.vowidroid.BuildConfig
 import com.vowi.vowidroid.NotificationChannels
 import com.vowi.vowidroid.R
@@ -92,6 +98,8 @@ fun SettingsScreen(
     var defaultLine by remember { mutableStateOf(LinePreferences.defaultLine(context)) }
     var about by remember { mutableStateOf(false) }
     var chooseLanguage by remember { mutableStateOf(false) }
+    var cardAccess by remember { mutableStateOf(false) }
+    val directAccess by VowiCore.directAccess.collectAsStateWithLifecycle()
     // Read once: a change recreates the screen, from here or from Android's settings.
     val language = remember { AppLanguage.current(context) }
     var callWaiting by remember { mutableStateOf(CallSettings.callWaiting(context)) }
@@ -279,6 +287,14 @@ fun SettingsScreen(
             }
             item {
                 ListItem(
+                    modifier = Modifier.clickable { cardAccess = true },
+                    leadingContent = { Icon(Icons.Filled.SimCard, contentDescription = null) },
+                    headlineContent = { Text(stringResource(R.string.settings_card_access)) },
+                    supportingContent = { Text(directAccessSummary(directAccess)) },
+                )
+            }
+            item {
+                ListItem(
                     modifier = Modifier.clickable(onClick = onLogs),
                     leadingContent = { Icon(Icons.Filled.BugReport, contentDescription = null) },
                     headlineContent = { Text(stringResource(R.string.settings_logs)) },
@@ -304,6 +320,27 @@ fun SettingsScreen(
         }
     }
 
+    if (cardAccess) {
+        val hash = remember { DirectCardAccess.certificateHash(context) }
+        AlertDialog(
+            onDismissRequest = { cardAccess = false },
+            title = { Text(stringResource(R.string.settings_card_access)) },
+            text = {
+                Column {
+                    Text(stringResource(R.string.settings_card_access_body))
+                    Text(hash, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 12.dp))
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("ARA-M SHA-1", hash))
+                    // Android 13+ shows its own "copied" notice.
+                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) Toast.makeText(context, R.string.settings_card_access_copied, Toast.LENGTH_SHORT).show()
+                }) { Text(stringResource(R.string.settings_card_access_copy)) }
+            },
+            dismissButton = { TextButton(onClick = { cardAccess = false }) { Text(stringResource(R.string.action_close)) } },
+        )
+    }
     if (chooseDefault) {
         val usable = lines.filter { it.usable }
         AlertDialog(
@@ -373,6 +410,7 @@ fun SectionHeader(text: String) {
 fun LineStatus(line: Line) {
     val quiet = MaterialTheme.colorScheme.onSurfaceVariant
     val (text, color) = when {
+        line.phase == VowiCore.PHASE_STOPPED -> stringResource(R.string.line_status_stopped) to quiet
         // Where the card is comes first: a line without its card cannot do anything.
         line.sim == Line.SimStatus.OFF -> stringResource(
             when (line.simReason) {
@@ -403,4 +441,22 @@ fun LineStatus(line: Line) {
         else -> stringResource(R.string.line_status_connecting) to MaterialTheme.colorScheme.onSurfaceVariant
     }
     Text(text, color = color, style = MaterialTheme.typography.bodyMedium)
+}
+
+/** One line on where direct card access stands: unsupported, connecting, or which slots' cards allowed or refused it. */
+@Composable
+private fun directAccessSummary(access: VowiCore.DirectAccess): String {
+    val context = LocalContext.current
+    val separator = stringResource(R.string.list_separator)
+    fun names(outcomes: Set<DirectCardOutcome>) =
+        access.outcomes.filterValues { it in outcomes }.keys.sorted().joinToString(separator) { context.getString(R.string.sim_slot_name, it + 1) }
+    val granted = names(setOf(DirectCardOutcome.GRANTED, DirectCardOutcome.LOCKED))
+    val denied = names(setOf(DirectCardOutcome.DENIED))
+    return when {
+        !access.supported -> stringResource(R.string.settings_card_access_unsupported)
+        !access.connected -> stringResource(R.string.settings_card_access_connecting)
+        granted.isNotEmpty() -> stringResource(R.string.settings_card_access_granted, granted)
+        denied.isNotEmpty() -> stringResource(R.string.settings_card_access_denied, denied)
+        else -> stringResource(R.string.settings_card_access_idle)
+    }
 }

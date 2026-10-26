@@ -58,6 +58,8 @@ data class FoundCard(
     val issue: String = "",
     /** Android's subscription ID for a card in a phone slot, or -1. */
     val subscriptionId: Int = -1,
+    /** Read over the card's own OMAPI channel rather than through Android telephony; see OmapiSims. */
+    val direct: Boolean = false,
 ) {
     /** VowiDroid read the card and can use it. */
     val readable: Boolean get() = imsi != null

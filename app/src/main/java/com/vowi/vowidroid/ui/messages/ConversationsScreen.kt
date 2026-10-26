@@ -91,6 +91,8 @@ import com.vowi.vowidroid.data.VowiRepository
 import com.vowi.vowidroid.ui.LineStatusCard
 import com.vowi.vowidroid.ui.NoLineCard
 import com.vowi.vowidroid.ui.PermissionCard
+import com.vowi.vowidroid.ui.StoppedCard
+import com.vowi.vowidroid.VowiCore
 import com.vowi.vowidroid.ui.TimeFormat
 import com.vowi.vowidroid.ui.components.Actions
 import com.vowi.vowidroid.ui.components.Avatar
@@ -131,6 +133,8 @@ fun ConversationsScreen(
     val blocked by BlockedNumbers.numbers.collectAsStateWithLifecycle()
     val allLines by VowiRepository.lines.collectAsStateWithLifecycle()
     val lines = usableLines()
+    // While the user has VowiDroid stopped, the stopped card explains the empty list; the no-line card would mislead.
+    val userStopped by VowiCore.userStopped.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     var selectedKeys by rememberSaveable { mutableStateOf(listOf<String>()) }
     var searching by rememberSaveable { mutableStateOf(false) }
@@ -386,10 +390,11 @@ fun ConversationsScreen(
                 return@LazyColumn
             }
             if (!archived) {
+                item { StoppedCard(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
                 item { PermissionCard(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
                 item { LineStatusCard(onOpenLine, Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
             }
-            if (!archived && lines.isEmpty()) {
+            if (!archived && lines.isEmpty() && !userStopped) {
                 item { NoLineCard(onSettings, Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
             }
             if (conversations.isEmpty()) {

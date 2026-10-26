@@ -99,6 +99,10 @@ class PhoneSims(context: Context) {
         )
     }
 
+    /** The phone's own IMEI for [slot], or "" when Android will not give it; the SIM-access grant covers device identifiers. */
+    @SuppressLint("HardwareIds", "MissingPermission")
+    fun imei(slot: Int): String = runCatching { telephony.getImei(slot)?.trim().orEmpty() }.getOrDefault("")
+
     /** Android sees no card at all in [slot], rather than one it cannot use right now. */
     fun slotEmpty(slot: Int): Boolean = runCatching { telephony.getSimState(slot) == TelephonyManager.SIM_STATE_ABSENT }.getOrDefault(false)
 

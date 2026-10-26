@@ -207,10 +207,18 @@ object IkeHandshake {
                 if (++round > MAX_EAP_ROUNDS) throw IkeException("ike: the EAP exchange exceeded $MAX_EAP_ROUNDS IKE_AUTH rounds")
                 messageId++
                 val payloads = mutableListOf(Payload(Ike.PAYLOAD_EAP, response))
-                if (deviceIdentityPending && responderAuth == ResponderAuthStatus.VERIFIED && params.imei.isNotEmpty()) {
-                    runCatching { IkeOffers.deviceIdentityNotify(params.imei) }.getOrNull()?.let(payloads::add)
-                }
                 if (IkeOffers.deviceIdentityRequested(current)) deviceIdentityPending = true
+                if (deviceIdentityPending) {
+                    // TS 24.302: the IMEI goes out only once the ePDG has proven itself, so a stranger never learns it.
+                    val notify = if (responderAuth == ResponderAuthStatus.VERIFIED && params.imei.isNotBlank()) runCatching { IkeOffers.deviceIdentityNotify(params.imei) }.getOrNull() else null
+                    CoreLog.i(TAG, "the ePDG asked for the device identity: " + when {
+                        notify != null -> "sending ${params.imei.trim().length} digits"
+                        params.imei.isBlank() -> "none is set for this line"
+                        else -> "not sent, the ePDG's certificate is ${responderAuth.wire}"
+                    })
+                    notify?.let(payloads::add)
+                    deviceIdentityPending = false
+                }
                 current = exchange(transport, sa, params, Ike.EXCHANGE_AUTH, messageId, payloads, random)
             }
             val akaKeys = aka.keys
