@@ -16,6 +16,7 @@ import com.vowi.vowidroid.core.ike.TunnelConnector
 import com.vowi.vowidroid.core.ike.TunnelParams
 import com.vowi.vowidroid.core.ims.ImsConfig
 import com.vowi.vowidroid.core.ims.ImsSession
+import com.vowi.vowidroid.core.sim.DownloadResult
 import com.vowi.vowidroid.core.ims.VoicemailWatcher
 import com.vowi.vowidroid.core.ims.VoicemailState
 import com.vowi.vowidroid.core.ims.UssdRuntime
@@ -94,6 +95,9 @@ class WifiCallingEngine(
 
         /** The SMS centre for this card, from the SIM, the user or the carrier profile. */
         fun smsCenter(identity: SimIdentity, profile: CarrierProfile): String
+
+        /** Hands an SMS-PP data download to the card, serving what it asks in return; null when the card cannot be reached that way. */
+        fun smsDataDownload(serviceCentre: ByteArray, tpdu: ByteArray, sendSms: (ByteArray, ByteArray) -> Boolean): DownloadResult? = null
     }
 
     /** How sockets reach the Wi-Fi network; the app binds them to it. */
@@ -104,6 +108,9 @@ class WifiCallingEngine(
 
         /** The network in use, in words: "Wi-Fi", "mobile data", "Ethernet", "VPN". */
         val description: String get() = ""
+
+        /** The network's MTU in bytes, or 0 when Android does not say. */
+        val mtu: Int get() = 0
 
         /** Why [available] is false, for the line's status. */
         val unavailableReason: String get() = "No network is connected"
@@ -119,6 +126,9 @@ class WifiCallingEngine(
 
         /** The service centre answered a submitted text: RP-ACK ([cause] null) or RP-ERROR with its cause. */
         fun onSmsSubmitResult(lineId: String, reference: Int, cause: Int?) = Unit
+
+        /** A message for the SIM card itself arrived and had to be left with the network. */
+        fun onSimDataUndeliverable(lineId: String) = Unit
         fun onIncomingCall(lineId: String, call: Call)
         fun onCallChanged(lineId: String, call: Call)
 
@@ -249,7 +259,12 @@ class WifiCallingEngine(
                 keepaliveMs = (if (tunnelSettings.nattKeepaliveSeconds > 0) tunnelSettings.nattKeepaliveSeconds else 20) * 1000L,
                 dpdEnabled = tunnelSettings.dpdEnabled ?: true,
             )
-            val tunnel = Tunnel(session, mtu = if (tunnelSettings.ipsecMtu > 0) tunnelSettings.ipsecMtu else NetStack.MTU) { error -> onFailure(attemptGeneration, "tunnel", error) }
+            // A path narrower than Wi-Fi's 1500 bytes, e.g. a VPN at 1280, would fragment every full-size segment on its way out.
+            val configuredMtu = if (tunnelSettings.ipsecMtu > 0) tunnelSettings.ipsecMtu else NetStack.MTU
+            val outerMtu = network.mtu
+            val mtu = NetStack.innerMtu(configuredMtu, outerMtu, handshake.evidence.epdgAddress.contains(':'))
+            if (mtu < configuredMtu) CoreLog.i(TAG, "inner MTU $mtu: the ${network.description} network carries $outerMtu bytes")
+            val tunnel = Tunnel(session, mtu = mtu) { error -> onFailure(attemptGeneration, "tunnel", error) }
             if (!enabled || generation.get() != attemptGeneration) {
                 tunnel.close()
                 return
@@ -274,6 +289,8 @@ class WifiCallingEngine(
                 override fun onStatus(status: ReceivedSmsStatus): Boolean = listener.onSmsStatus(lineId, status)
                 override fun onSubmitResult(reference: Int, cause: Int?) = listener.onSmsSubmitResult(lineId, reference, cause)
             }
+            sms.uicc = SmsOverIms.UiccDataDownload { centre, tpdu, send -> sim.smsDataDownload(centre, tpdu, send) }
+            sms.onSimDataUndeliverable = { listener.onSimDataUndeliverable(lineId) }
             calls.listener = object : CallRuntime.Listener {
                 override fun onIncoming(call: Call) = listener.onIncomingCall(lineId, call)
                 override fun onStateChanged(call: Call) = listener.onCallChanged(lineId, call)

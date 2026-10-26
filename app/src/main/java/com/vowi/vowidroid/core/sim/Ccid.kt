@@ -112,6 +112,11 @@ fun interface SmartCard {
  * powered on demand and kept powered, as pcscd does, until [powerOff].
  */
 class CcidReader(private val transport: CcidTransport, val descriptor: CcidDescriptor) : SmartCard {
+    /** How many times the card was powered on, so a toolkit wrapper knows when it starts afresh. */
+    @Volatile
+    var powerCycles = 0
+        private set
+
     enum class Slot { ACTIVE, INACTIVE, ABSENT }
 
     private var sequence = 0
@@ -164,6 +169,7 @@ class CcidReader(private val transport: CcidTransport, val descriptor: CcidDescr
             }
             atr = answer
             powered = true
+            powerCycles++
             try {
                 configure(answer)
             } catch (error: Exception) {

@@ -179,4 +179,26 @@ class SmsCodecTest {
         assertNull(acknowledged.cause)
         assertNull(SmsOverIms.parseRpdu(byteArrayOf(0x05, 7)).cause)
     }
+
+    @Test
+    fun rpDataKeepsTheCentresAddressForTheCard() {
+        // From the network: RP-DATA, reference 7, the centre as RP-OA, an empty RP-DA, then the TPDU.
+        val parsed = SmsOverIms.parseRpdu(("0107" + "07" + "91887766554433" + "00" + "03" + "040011").hexToBytes())
+        assertEquals("91887766554433", parsed.originatingAddress.toHex())
+        assertEquals("+887766554433", SmsOverIms.decodeRpAddress(parsed.originatingAddress))
+        assertEquals("040011", parsed.tpdu.toHex())
+    }
+
+    @Test
+    fun acknowledgementsCarryTheCardsAnswer() {
+        val report = SmsOverIms.buildDeliverReport(null, 0x7f, 0xf6, "0102".hexToBytes())
+        assertEquals("00077ff6020102", report.toHex())
+        assertEquals("0207" + "41" + "07" + "00077ff6020102", SmsOverIms.buildRpAck(7, report).toHex())
+        assertEquals("0207", SmsOverIms.buildRpAck(7).toHex())
+        val error = SmsOverIms.buildDeliverReport(0xd5, 0x7f, 0xf6, "09".hexToBytes())
+        assertEquals("00d5077ff60109", error.toHex())
+        assertEquals("04070115" + "41" + "07" + "00d5077ff60109", SmsOverIms.buildRpError(7, 21, error).toHex())
+        // RP-DATA to a centre given the way the card gives it.
+        assertEquals("0007" + "00" + "07" + "91887766554433" + "02" + "0100", SmsOverIms.buildRpData(7, "91887766554433".hexToBytes(), "0100".hexToBytes()).toHex())
+    }
 }

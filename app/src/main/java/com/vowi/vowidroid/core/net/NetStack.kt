@@ -265,9 +265,30 @@ class NetStack(
         /**
          * Inner packets stay at the IPv6 minimum MTU, leaving room for
          * ipsec-3gpp transport ESP plus the tunnel's ESP-in-UDP framing under a
-         * 1500-byte path, so TCP segments never need outer fragmentation.
+         * 1500-byte path, so TCP segments never need outer fragmentation. A
+         * smaller path, such as a VPN, gets a smaller inner MTU from [innerMtu].
          */
         const val MTU = 1280
+
+        /** Below this nothing useful fits; also the IPv4 minimum reassembly size. */
+        const val MINIMUM_MTU = 576
+
+        /** The most one ESP layer adds: SPI and sequence, a 16-byte IV, padding, the trailer, and a 16-byte ICV. */
+        private const val ESP_OVERHEAD = 8 + 16 + 15 + 2 + 16
+
+        /**
+         * The inner MTU for a path of [outerMtu] bytes (0 when unknown, taken
+         * as wide enough): [configured] unless the outer path cannot carry it
+         * once ipsec-3gpp transport ESP, the tunnel's ESP, UDP and the outer
+         * IP header are added. Rounded down to a multiple of eight so inner
+         * fragments stay aligned. A VPN often runs at 1280, where 1136 fits.
+         */
+        fun innerMtu(configured: Int, outerMtu: Int, outerIpv6: Boolean): Int {
+            if (outerMtu <= 0) return configured
+            val overhead = (if (outerIpv6) 40 else 20) + 8 + 2 * ESP_OVERHEAD
+            val fits = ((outerMtu - overhead) / 8) * 8
+            return minOf(configured, fits).coerceAtLeast(MINIMUM_MTU)
+        }
 
         fun flowKey(localAddress: ByteArray, localPort: Int, remoteAddress: ByteArray, remotePort: Int): Long {
             var hash = 1125899906842597L

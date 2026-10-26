@@ -187,6 +187,12 @@ to the next attempt (10 s, then 20 s, then every 30 s). The usual causes:
   not reachable from this network. Some carriers answer only from their home
   country; a VPN with an exit there works, with the line's **Network** set
   to Automatic or VPN only.
+- **"the P-CSCF did not acknowledge the SIP request" or "closed by the
+  P-CSCF" after the tunnel came up, typically over a VPN**: the path under
+  the tunnel is narrower than Wi-Fi's 1500 bytes (many VPNs run at 1280),
+  so full-size packets were fragmented and lost. VowiDroid now reads the
+  network's MTU and sizes its packets to fit; the log says "inner MTU …"
+  when it had to shrink them.
 - **A bare private code such as 16377, right after IKE_SA_INIT**: some
   carriers ask the ePDG for the phone's IMEI and allow only devices they
   know. Set one under the line's **Device identity (IMEI)**: the phone's own,
@@ -264,6 +270,18 @@ the line's settings. Each line shows the number in use and where it came from un
 which wins over both. The entry is stored by ICCID, so a swapped card never
 inherits it. Verizon, Bell and Telus publish no number, so those lines need
 an entry.
+
+### Messages for the SIM card
+
+Carriers configure a SIM remotely with text messages addressed to the card
+itself (SMS-PP data download, TS 31.111), for example right after an
+activation. A SIM in a USB reader gets them: VowiDroid hands each one to
+the card the way a phone's modem does, returns the card's answer to the
+network, and sends any text the card asks to send in reply. A SIM in the
+phone's slot cannot be reached that way, since Android keeps the card's
+toolkit for the modem; VowiDroid then refuses the message as a temporary
+failure, so the network keeps it and can deliver it through the modem, and
+shows a notification saying so.
 
 ### Notifications
 

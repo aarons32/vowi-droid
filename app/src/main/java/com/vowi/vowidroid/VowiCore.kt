@@ -7,6 +7,7 @@ import com.vowi.vowidroid.core.sim.AkaException
 import com.vowi.vowidroid.core.sim.AkaResult
 import com.vowi.vowidroid.core.sim.CardChangedException
 import com.vowi.vowidroid.core.sim.CardMatcher
+import com.vowi.vowidroid.core.sim.DownloadResult
 import com.vowi.vowidroid.core.sim.FoundCard
 import com.vowi.vowidroid.core.sim.SavedLine
 import com.vowi.vowidroid.core.sim.SimCardException
@@ -284,6 +285,13 @@ object VowiCore {
                 // The user's own entry first, then the SIM's number, then the carrier's usual one.
                 override fun smsCenter(identity: SimIdentity, profile: CarrierProfile): String =
                     SmsCenters.choose(PhoneSims.savedSmsCenter(app, identity.iccid), identity.smsc, profile.smsCenter)
+
+                override fun smsDataDownload(serviceCentre: ByteArray, tpdu: ByteArray, sendSms: (ByteArray, ByteArray) -> Boolean): DownloadResult? {
+                    // Only a card in a USB reader is VowiDroid's to talk to; in a phone slot the modem owns the card's toolkit.
+                    val card = placed[lineId] ?: return null
+                    val reader = card.location as? SimLocation.UsbReader ?: return null
+                    return usbReaders.smsDataDownload(reader.device, card.iccid, serviceCentre, tpdu, sendSms) { rescan() }
+                }
             },
             network = lineNetworks.getOrPut(lineId) { LineNetwork(lineId) },
             codecs = AndroidCodecFactory,
@@ -476,6 +484,10 @@ object VowiCore {
             } else {
                 CoreLog.i(TAG, "RP-ERROR $cause for reference $reference matches no sent text")
             }
+        }
+
+        override fun onSimDataUndeliverable(lineId: String) {
+            SimNotifications.dataDownloadRefused(app, lineId, lineName(lineId))
         }
 
         override fun onSmsStatus(lineId: String, status: ReceivedSmsStatus): Boolean {
@@ -1092,6 +1104,12 @@ object VowiCore {
             }
         }
 
+        /** The MTU Android reports for [network], e.g. a VPN's 1280; 0 when unknown or before Android 10. */
+        fun mtu(network: Network?): Int {
+            if (network == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return 0
+            return runCatching { connectivity.getLinkProperties(network)?.mtu ?: 0 }.getOrDefault(0)
+        }
+
         fun describe(network: Network?): String {
             val caps = network?.let { networks[it] ?: runCatching { connectivity.getNetworkCapabilities(it) }.getOrNull() } ?: return if (network != null) "network" else ""
             return when {
@@ -1142,6 +1160,8 @@ object VowiCore {
             network.bindSocket(socket)
             bound = network
         }
+
+        override val mtu: Int get() = networks.mtu(bound ?: selected())
 
         override fun resolver(): EpdgResolver = EpdgResolver(lookup = { host ->
             val network = selected() ?: throw IOException(unavailableReason)

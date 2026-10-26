@@ -11,6 +11,7 @@ import com.vowi.vowidroid.core.ims.originatingIdentities
 import com.vowi.vowidroid.core.ims.mmtelContact
 import com.vowi.vowidroid.core.sip.SipBuilder
 import com.vowi.vowidroid.core.sip.SipMessage
+import com.vowi.vowidroid.core.sip.SipTrace
 import com.vowi.vowidroid.core.util.CoreLog
 import com.vowi.vowidroid.core.util.Rng
 import com.vowi.vowidroid.core.util.toHex
@@ -205,7 +206,9 @@ class CallRuntime(private val session: ImsSession, private val codecs: AudioCode
         val key = "$callId:$cseq:INVITE"
         try {
             session.beginTransaction(key, dialog.responses)
-            session.send(builder.build())
+            val packet = builder.build()
+            CoreLog.d(TAG, "INVITE headers: ${SipTrace.headerLine(packet)}")
+            session.send(packet)
         } catch (error: Exception) {
             session.endTransaction(key)
             media.close()
@@ -257,6 +260,7 @@ class CallRuntime(private val session: ImsSession, private val codecs: AudioCode
                     setState(dialog.callId, CallState.ACTIVE)
                     startSessionTimer(dialog, response.value("Session-Expires"))
                 } else {
+                    if (!dialog.terminated) CoreLog.d(TAG, "SIP ${response.statusCode} headers: ${SipTrace.headerLine(response)}")
                     runCatching { sendFailureAck(dialog, response, dialog.branch, dialog.inviteCseq, dialog.inviteTarget.ifEmpty { dialog.target }) }
                         .exceptionOrNull()?.let { CoreLog.w(TAG, "rejected INVITE ACK failed: ${it.message}") }
                     // CANCEL ends with 487; that is our own hang-up, not a network rejection.

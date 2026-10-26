@@ -220,4 +220,19 @@ class NetStackTest {
     }
 
     private operator fun ByteArray.plus(other: ByteArray): ByteArray = com.vowi.vowidroid.core.util.concat(this, other)
+
+    @Test
+    fun innerMtuFitsThePath() {
+        // Wi-Fi, or an unknown path: the default stands.
+        assertEquals(1280, NetStack.innerMtu(1280, 1500, outerIpv6 = false))
+        assertEquals(1280, NetStack.innerMtu(1280, 0, outerIpv6 = false))
+        // A VPN at 1280 bytes: two ESP layers, UDP and IPv4 must still fit, so 1136.
+        assertEquals(1136, NetStack.innerMtu(1280, 1280, outerIpv6 = false))
+        // Over an IPv6 outer path the header is 20 bytes longer.
+        assertEquals(1112, NetStack.innerMtu(1280, 1280, outerIpv6 = true))
+        // A carrier's smaller setting is kept when it already fits.
+        assertEquals(1200, NetStack.innerMtu(1200, 1500, outerIpv6 = false))
+        // Never below the floor.
+        assertEquals(NetStack.MINIMUM_MTU, NetStack.innerMtu(1280, 600, outerIpv6 = false))
+    }
 }

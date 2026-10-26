@@ -588,4 +588,8 @@
     <string name="stopped_body">你已通过通知停止了 VowiDroid。线路仍会保留，重新启动即可再次连接。</string>
     <string name="stopped_action">启动</string>
     <string name="line_status_stopped">已停止 · VowiDroid 未运行</string>
+
+    <!-- A message for the SIM card itself that could not be delivered -->
+    <string name="sim_data_title">一条发给 SIM 卡的消息未能送达</string>
+    <string name="sim_data_body">%1$s 的运营商发来了一条给 SIM 卡本身的配置消息。VowiDroid 无法把它交给手机卡槽中的 SIM 卡，已将其留在网络中。请把 SIM 卡放进手机，或放进连接 VowiDroid 的 USB 读卡器来接收它。</string>
 </resources>

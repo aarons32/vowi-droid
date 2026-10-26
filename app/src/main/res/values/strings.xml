@@ -608,4 +608,8 @@
     <string name="stopped_body">You stopped VowiDroid from its notification. Your lines are kept; start it again to connect them.</string>
     <string name="stopped_action">Start</string>
     <string name="line_status_stopped">Stopped · VowiDroid is not running</string>
+
+    <!-- A message for the SIM card itself that could not be delivered -->
+    <string name="sim_data_title">A message for the SIM card was not delivered</string>
+    <string name="sim_data_body">The carrier of %1$s sent a configuration message for the SIM card itself. VowiDroid cannot pass it to a SIM in the phone\'s slot and left it with the network. Put the SIM in a phone, or in a USB reader with VowiDroid, to receive it.</string>
 </resources>

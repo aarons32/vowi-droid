@@ -18,6 +18,7 @@ object SimNotifications {
     private const val PREFERENCES = "sim_cards"
     private const val KEY_ANNOUNCED = "announced"
     private const val ID_BASE = 0x51c0
+    private const val ID_DATA_BASE = 0x51d0
 
     @Synchronized
     fun announce(context: Context, cards: List<FoundCard>, describe: (SimLocation) -> String) {
@@ -68,5 +69,32 @@ object SimNotifications {
             .addAction(0, app.getString(R.string.add_line_action), open)
             .build()
         manager.notify(ID_BASE + card.iccid.hashCode(), notification)
+    }
+
+    /**
+     * A message for the SIM card itself arrived on [lineName], whose card
+     * VowiDroid cannot reach from a phone slot; the network keeps the message.
+     */
+    @SuppressLint("MissingPermission") // checked by areNotificationsEnabled
+    fun dataDownloadRefused(context: Context, lineId: String, lineName: String) {
+        val app = context.applicationContext
+        val manager = NotificationManagerCompat.from(app)
+        if (!manager.areNotificationsEnabled()) return
+        val open = PendingIntent.getActivity(
+            app, lineId.hashCode(),
+            Intent(app, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        val body = app.getString(R.string.sim_data_body, lineName.ifEmpty { app.getString(R.string.sim_card_default_name) })
+        val notification = NotificationCompat.Builder(app, NotificationChannels.SIM_CARDS)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(app.getString(R.string.sim_data_title))
+            .setContentText(body)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+            .setContentIntent(open)
+            .setAutoCancel(true)
+            .setOnlyAlertOnce(true)
+            .build()
+        manager.notify(ID_DATA_BASE + lineId.hashCode(), notification)
     }
 }

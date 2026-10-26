@@ -25,6 +25,11 @@ import com.vowi.vowidroid.core.sim.SimIdentity
 import com.vowi.vowidroid.core.sim.SimLocation
 import com.vowi.vowidroid.core.sim.SimPinRequiredException
 import com.vowi.vowidroid.core.sim.Usim
+import com.vowi.vowidroid.core.sim.ToolkitCard
+import com.vowi.vowidroid.core.sim.ProactiveHandler
+import com.vowi.vowidroid.core.sim.DownloadResult
+import com.vowi.vowidroid.core.sim.CardChangedException
+import com.vowi.vowidroid.core.sim.Cat
 import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
@@ -50,6 +55,9 @@ class UsbSimReaders(context: Context, private val onChange: () -> Unit) {
 
     private class Handle(val device: UsbDevice, val connection: UsbDeviceConnection, val face: UsbInterface, val reader: CcidReader, val name: String) {
         val lock = Any()
+
+        /** The card with its toolkit served, which every APDU goes through. */
+        val toolkit = ToolkitCard(reader) { reader.powerCycles }
 
         /** The card in the reader, while VowiDroid knows it is the same card. */
         @Volatile
@@ -130,7 +138,7 @@ class UsbSimReaders(context: Context, private val onChange: () -> Unit) {
         synchronized(handle.lock) {
             handle.parked = false
             handle.reader.powerOn()
-            return Usim.readIdentity(handle.reader)
+            return Usim.readIdentity(handle.toolkit)
         }
     }
 
@@ -140,7 +148,41 @@ class UsbSimReaders(context: Context, private val onChange: () -> Unit) {
         synchronized(handle.lock) {
             handle.parked = false
             handle.reader.powerOn()
-            return Usim.authenticate(handle.reader, challenge, expectedIccid)
+            return Usim.authenticate(handle.toolkit, challenge, expectedIccid)
+        }
+    }
+
+    /**
+     * Hands an SMS-PP data download to the card in [device], as a phone's
+     * modem would, and serves what the card asks in return: a text to send
+     * through [sendSms], or a refresh, after which the card is read again
+     * and [onRefresh] runs.
+     */
+    fun smsDataDownload(device: String, expectedIccid: String, serviceCentre: ByteArray, tpdu: ByteArray, sendSms: (ByteArray, ByteArray) -> Boolean, onRefresh: () -> Unit): DownloadResult {
+        val handle = handle(device)
+        var refreshMode = -1
+        return synchronized(handle.lock) {
+            handle.parked = false
+            handle.reader.powerOn()
+            if (!Usim.readIccid(handle.toolkit).equals(expectedIccid.trimEnd('f', 'F'), ignoreCase = true)) throw CardChangedException()
+            if (!handle.toolkit.toolkit) throw SimCardException("the card took no terminal profile, so it cannot be handed messages")
+            handle.toolkit.handler = object : ProactiveHandler {
+                override fun sendSms(serviceCentre: ByteArray, tpdu: ByteArray): Boolean = sendSms(serviceCentre, tpdu)
+                override fun refresh(qualifier: Int) {
+                    refreshMode = qualifier
+                }
+            }
+            try {
+                Cat.smsDownload(handle.toolkit, serviceCentre, tpdu)
+            } finally {
+                handle.toolkit.handler = ProactiveHandler.NONE
+                if (refreshMode >= 0) {
+                    // The card's files changed: the reset it may have asked for, and in any case a fresh read.
+                    if (refreshMode == 4) runCatching { handle.reader.powerOff() }
+                    handle.card = null
+                    onRefresh()
+                }
+            }
         }
     }
 
@@ -165,11 +207,11 @@ class UsbSimReaders(context: Context, private val onChange: () -> Unit) {
         if (known != null && (slot == CcidReader.Slot.ACTIVE || handle.parked)) return known
         handle.parked = false
         handle.reader.powerOn()
-        val iccid = Usim.readIccid(handle.reader)
+        val iccid = Usim.readIccid(handle.toolkit)
         val location = SimLocation.UsbReader(handle.device.deviceName, handle.name)
         // The carrier's name labels the card; a PIN-locked card gives no IMSI but is still told apart by its ICCID.
         val identity = try {
-            Usim.readIdentity(handle.reader)
+            Usim.readIdentity(handle.toolkit)
         } catch (error: SimPinRequiredException) {
             null
         }

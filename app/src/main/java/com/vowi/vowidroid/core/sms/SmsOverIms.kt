@@ -2,6 +2,7 @@ package com.vowi.vowidroid.core.sms
 
 import com.vowi.vowidroid.core.ims.ImsException
 import com.vowi.vowidroid.core.ims.ImsSession
+import com.vowi.vowidroid.core.sim.DownloadResult
 import com.vowi.vowidroid.core.ims.ImsSupport
 import com.vowi.vowidroid.core.sip.SipBuilder
 import com.vowi.vowidroid.core.sip.SipMessage
@@ -73,6 +74,18 @@ class SmsOverIms(private val session: ImsSession, private val smsCenter: () -> S
 
     @Volatile
     var listener: Listener? = null
+
+    /** The card behind the line, for messages addressed to it; null from a phone slot, where the modem owns the card. */
+    fun interface UiccDataDownload {
+        fun deliver(serviceCentre: ByteArray, tpdu: ByteArray, sendSms: (ByteArray, ByteArray) -> Boolean): DownloadResult?
+    }
+
+    @Volatile
+    var uicc: UiccDataDownload? = null
+
+    /** Called when a message for the card had to be left with the network. */
+    @Volatile
+    var onSimDataUndeliverable: (() -> Unit)? = null
     private val rpReference = AtomicInteger(0)
     private val sendLock = Any()
 
@@ -126,9 +139,9 @@ class SmsOverIms(private val session: ImsSession, private val smsCenter: () -> S
         val callId = request.callId
         if (message.decodeError.isNotEmpty()) CoreLog.w(TAG, "inbound TPDU decode problem: ${message.decodeError}")
         if (message.simDataDownload) {
-            // SMS-PP data download targets the UICC; without a handler the transport is still acknowledged.
-            CoreLog.i(TAG, "inbound SIM data download acknowledged without a UICC handler")
-            deliveryReport(request, buildRpAck(rpdu.reference))
+            // SMS-PP data download is for the card, served off this thread: the card may ask for a text to be
+            // sent in return, and that needs the connection's dispatcher free.
+            Thread({ dataDownload(request, rpdu, message) }, "vowi-sms-pp").apply { isDaemon = true }.start()
             return
         }
         when {
@@ -178,6 +191,65 @@ class SmsOverIms(private val session: ImsSession, private val smsCenter: () -> S
                 deliveryReport(request, buildRpError(rpdu.reference, 95))
             }
         }
+    }
+
+    /**
+     * Hands a message meant for the card to it, as a phone's modem would, and
+     * reports the card's answer to the network. Without a way to the card the
+     * message is refused as a temporary failure, so the network keeps it and
+     * may deliver it through the phone's own modem.
+     */
+    private fun dataDownload(request: SipMessage, rpdu: RpMessage, message: SmsMessage) {
+        val result = try {
+            uicc?.deliver(rpdu.originatingAddress, rpdu.tpdu) { centre, tpdu -> submitTpdu(centre, tpdu) }
+        } catch (error: Exception) {
+            CoreLog.w(TAG, "SIM data download failed at the card: ${error.message}")
+            deliveryReport(request, buildRpError(rpdu.reference, RP_CAUSE_TEMPORARY_FAILURE))
+            return
+        }
+        when {
+            result == null -> {
+                CoreLog.i(TAG, "inbound SIM data download left with the network: the card cannot be reached from here")
+                onSimDataUndeliverable?.invoke()
+                deliveryReport(request, buildRpError(rpdu.reference, RP_CAUSE_TEMPORARY_FAILURE))
+            }
+            result.busy -> {
+                CoreLog.i(TAG, "inbound SIM data download: the card's toolkit is busy, so the network will retry")
+                deliveryReport(request, buildRpError(rpdu.reference, RP_CAUSE_TEMPORARY_FAILURE))
+            }
+            result.accepted -> {
+                CoreLog.i(TAG, "inbound SIM data download taken by the card" + if (result.data.isNotEmpty()) ", which answers ${result.data.size} bytes" else "")
+                val report = if (result.data.isNotEmpty()) buildDeliverReport(null, message.protocolId, message.dataCodingScheme, result.data) else null
+                deliveryReport(request, buildRpAck(rpdu.reference, report))
+            }
+            else -> {
+                CoreLog.w(TAG, "inbound SIM data download refused by the card (${result.data.size} bytes of error data)")
+                val report = buildDeliverReport(TP_FCS_SIM_DATA_DOWNLOAD_ERROR, message.protocolId, message.dataCodingScheme, result.data)
+                deliveryReport(request, buildRpError(rpdu.reference, RP_CAUSE_TRANSFER_REJECTED, report))
+            }
+        }
+    }
+
+    /**
+     * Sends one SMS-SUBMIT the card prepared, through [serviceCentre] (a
+     * type-of-address octet and BCD digits, or empty for the line's own
+     * centre); true once the IMS core accepted it.
+     */
+    fun submitTpdu(serviceCentre: ByteArray, tpdu: ByteArray): Boolean = synchronized(sendLock) {
+        if (!session.smsReady || tpdu.size < 2) return false
+        val address = serviceCentre.takeIf { it.size >= 2 } ?: runCatching { encodeRpAddress(smsCenter().trim()) }.getOrNull() ?: return false
+        val reference = rpReference.getAndIncrement() and 0xff
+        val submit = tpdu.copyOf()
+        submit[1] = reference.toByte()
+        val response = try {
+            sendMessage("tel:" + decodeRpAddress(address), buildRpData(reference, address, submit), "", SMS_CONTENT_TYPE, "smsip", "")
+        } catch (error: Exception) {
+            CoreLog.w(TAG, "the card's text could not be sent: ${error.message}")
+            return false
+        }
+        val accepted = response.statusCode in 200..299
+        CoreLog.i(TAG, "the card's text was " + if (accepted) "accepted" else "refused with SIP ${response.statusCode}")
+        accepted
     }
 
     private fun deliveryReport(request: SipMessage, report: ByteArray) {
@@ -357,7 +429,8 @@ class SmsOverIms(private val session: ImsSession, private val smsCenter: () -> S
         const val RP_ACK = 3
         const val RP_ERROR = 5
 
-        class RpMessage(val messageType: Int, val reference: Int, val tpdu: ByteArray, val cause: Int? = null)
+        /** An RP message; [originatingAddress] is the centre's address of an RP-DATA (type-of-address octet and BCD digits), for the card. */
+        class RpMessage(val messageType: Int, val reference: Int, val tpdu: ByteArray, val cause: Int? = null, val originatingAddress: ByteArray = ByteArray(0))
 
         /** Parses an RP-DATA (3GPP TS 24.011 7.3.1); an RP-ERROR carries its cause, other RP types only their reference. */
         fun parseRpdu(data: ByteArray): RpMessage {
@@ -371,22 +444,27 @@ class SmsOverIms(private val session: ImsSession, private val smsCenter: () -> S
             }
             if (messageType != RP_DATA) return RpMessage(messageType, reference, ByteArray(0))
             var index = 2
-            repeat(2) {
+            var originating = ByteArray(0)
+            for (position in 0 until 2) {
                 if (index >= data.size) throw SmsException("RP-DATA address is truncated")
                 val length = data.u8(index)
                 index++
                 if (length > data.size - index) throw SmsException("RP-DATA address length is invalid")
+                if (position == 0) originating = data.copyOfRange(index, index + length)
                 index += length
             }
             if (index >= data.size) throw SmsException("RP-DATA omitted user data")
             val length = data.u8(index)
             index++
             if (length == 0 || length > data.size - index) throw SmsException("RP-DATA user-data length is invalid")
-            return RpMessage(messageType, reference, data.copyOfRange(index, index + length))
+            return RpMessage(messageType, reference, data.copyOfRange(index, index + length), originatingAddress = originating)
         }
 
-        fun buildRpData(reference: Int, smsc: String, tpdu: ByteArray): ByteArray {
-            val address = encodeRpAddress(smsc)
+        fun buildRpData(reference: Int, smsc: String, tpdu: ByteArray): ByteArray = buildRpData(reference, encodeRpAddress(smsc), tpdu)
+
+        /** RP-DATA (TS 24.011 7.3.1.2) to the centre at [address], a type-of-address octet and BCD digits. */
+        fun buildRpData(reference: Int, address: ByteArray, tpdu: ByteArray): ByteArray {
+            if (address.size < 2 || address.size > 12) throw SmsException("the SMS service centre address is invalid")
             if (tpdu.isEmpty() || tpdu.size > 232) throw SmsException("SMS TPDU length is invalid")
             val out = ArrayList<Byte>()
             out.add(0x00)
@@ -399,9 +477,43 @@ class SmsOverIms(private val session: ImsSession, private val smsCenter: () -> S
             return out.toByteArray()
         }
 
-        fun buildRpAck(reference: Int): ByteArray = byteArrayOf(0x02, reference.toByte())
+        /** RP-ACK (TS 24.011 7.3.3), with an SMS-DELIVER-REPORT as RP-User-Data when the card answered something. */
+        fun buildRpAck(reference: Int, report: ByteArray? = null): ByteArray = byteArrayOf(0x02, reference.toByte()) + userData(report)
 
-        fun buildRpError(reference: Int, cause: Int): ByteArray = byteArrayOf(0x04, reference.toByte(), 0x01, (cause and 0x7f).toByte())
+        fun buildRpError(reference: Int, cause: Int, report: ByteArray? = null): ByteArray =
+            byteArrayOf(0x04, reference.toByte(), 0x01, (cause and 0x7f).toByte()) + userData(report)
+
+        private fun userData(report: ByteArray?): ByteArray =
+            if (report == null || report.isEmpty()) ByteArray(0) else byteArrayOf(0x41, report.size.toByte()) + report
+
+        /**
+         * An SMS-DELIVER-REPORT (TS 23.040 9.2.2.1a) carrying the card's answer
+         * to a data download, with the message's protocol identifier and
+         * coding scheme; [failureCause] is the TP-FCS of the RP-ERROR form.
+         */
+        fun buildDeliverReport(failureCause: Int?, protocolId: Int, dataCodingScheme: Int, data: ByteArray): ByteArray {
+            if (data.size > 140) throw SmsException("the card's answer is too long for a delivery report")
+            val head = if (failureCause == null) byteArrayOf(0x00) else byteArrayOf(0x00, failureCause.toByte())
+            return head + byteArrayOf(0x07, protocolId.toByte(), dataCodingScheme.toByte(), data.size.toByte()) + data
+        }
+
+        /** The digits of an RP address, with a + when it is international. */
+        fun decodeRpAddress(address: ByteArray): String {
+            if (address.size < 2) throw SmsException("the RP address is too short")
+            val digits = StringBuilder()
+            for (octet in address.copyOfRange(1, address.size)) {
+                val low = octet.toInt() and 0x0f
+                val high = (octet.toInt() shr 4) and 0x0f
+                if (low <= 9) digits.append('0' + low)
+                if (high <= 9) digits.append('0' + high)
+            }
+            return (if (address[0].toInt() and 0x70 == 0x10) "+" else "") + digits
+        }
+
+        /** RP causes (TS 24.011 8.2.5.4) and the TP failure cause (TS 23.040 9.2.3.22) used for the card. */
+        const val RP_CAUSE_TRANSFER_REJECTED = 21
+        const val RP_CAUSE_TEMPORARY_FAILURE = 41
+        const val TP_FCS_SIM_DATA_DOWNLOAD_ERROR = 0xd5
 
         fun encodeRpAddress(value: String): ByteArray {
             val normalized = normalizeE164(value)
